@@ -360,6 +360,12 @@
     return iconeCalendarioBase('<line x1="10" y1="16" x2="14" y2="16"/>', tamanho);
   }
 
+  // "x" pra limpar o campo de busca.
+  function iconeFechar(tamanho) {
+    var path = '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>';
+    return svgIcone(path, { tamanho: tamanho });
+  }
+
   // -----------------------------------------------------------
   // Programação — estado dos filtros + paginação incremental
   // -----------------------------------------------------------
@@ -437,8 +443,12 @@
 
     html += '<div class="filtros__busca-linha">';
     html += '<label class="filtros__label filtros__label--busca" for="filtro-busca">Buscar' +
+      '<span class="filtros__busca-wrap">' +
       '<input type="search" id="filtro-busca" class="filtros__busca" ' +
-      'placeholder="Título, palestrante ou empresa…"></label>';
+      'placeholder="Título, palestrante ou empresa…">' +
+      '<button type="button" id="filtro-busca-x" class="filtros__busca-x" hidden aria-label="Limpar busca">' +
+      iconeFechar(14) + '</button>' +
+      '</span></label>';
     html += '<button type="button" id="filtro-limpar" class="filtros__limpar" hidden>Limpar filtros</button>';
     html += '</div>';
 
@@ -448,6 +458,13 @@
   function atualizarBotaoLimpar(container) {
     var botao = container.querySelector('#filtro-limpar');
     if (botao) botao.hidden = !filtrosEstaoAtivos();
+  }
+
+  // "x" dentro do campo de busca: só aparece com texto digitado.
+  function atualizarBotaoBuscaX(container) {
+    var busca = container.querySelector('#filtro-busca');
+    var botaoX = container.querySelector('#filtro-busca-x');
+    if (busca && botaoX) botaoX.hidden = busca.value === '';
   }
 
   // gerencia só os chips de DIA (seleção single-choice); o chip "Tenho
@@ -482,6 +499,7 @@
     if (selPredio) selPredio.value = 'todos';
     if (selTipo) selTipo.value = 'todos';
     if (busca) busca.value = '';
+    atualizarBotaoBuscaX(container);
 
     var elInteresse = container.querySelector('#filtro-interesse');
     if (elInteresse) {
@@ -518,12 +536,24 @@
       var temporizador = null;
       elBusca.addEventListener('input', function (evento) {
         var valor = evento.target.value;
+        atualizarBotaoBuscaX(container);
         clearTimeout(temporizador);
         // debounce ~200ms: evita filtrar/renderizar a cada tecla
         temporizador = setTimeout(function () {
           filtroEstado.busca = valor;
           aoMudarFiltro(container);
         }, 200);
+      });
+    }
+
+    var elBuscaX = container.querySelector('#filtro-busca-x');
+    if (elBuscaX) {
+      elBuscaX.addEventListener('click', function () {
+        if (elBusca) elBusca.value = '';
+        elBuscaX.hidden = true;
+        filtroEstado.busca = '';
+        if (elBusca) elBusca.focus();
+        aoMudarFiltro(container);
       });
     }
 

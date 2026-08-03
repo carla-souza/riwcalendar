@@ -137,7 +137,7 @@ body {
 .abas__botao {
   flex: 1 1 0;
   min-height: 44px;
-  padding: 8px 4px 10px;
+  padding: 12px 4px 14px;
   border: none;
   background: transparent;
   color: var(--texto-secundario);
@@ -396,6 +396,46 @@ body {
 .filtros__busca:focus {
   outline: 2px solid var(--cor-acao);
   outline-offset: 1px;
+}
+
+/* wrapper só pra posicionar o "x" de limpar dentro do campo; o campo em
+   si continua com a mesma classe/estilo de sempre. */
+.filtros__busca-wrap {
+  position: relative;
+  display: block;
+}
+
+.filtros__busca-wrap .filtros__busca {
+  padding-right: 32px;
+}
+
+/* esconde o "x" nativo do input[type=search] (Chrome/Safari) pra não
+   duplicar com o nosso, que funciona igual em todo navegador. */
+.filtros__busca-wrap .filtros__busca::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.filtros__busca-x {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--texto-secundario);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.filtros__busca-x:active {
+  background: var(--superficie-lista);
 }
 
 /* "Minha marcação" — mesmo campo visual dos selects, mas é um botão:
