@@ -1,0 +1,76 @@
+{
+ "unidade": "minutos_caminhada",
+ "calibracao": "Armazém 2->5 = 5min Google -> 10min (2x); depois +2 buffer e piso 5 -> ver matriz",
+ "matriz": {
+  "Armazém 1": {
+   "Armazém 1": 5,
+   "Armazém 2": 5,
+   "Armazém 3": 9,
+   "Armazém 4": 12,
+   "Armazém 5": 15,
+   "Kobra": 15,
+   "NAM Atlântico": 9
+  },
+  "Armazém 2": {
+   "Armazém 1": 5,
+   "Armazém 2": 5,
+   "Armazém 3": 5,
+   "Armazém 4": 9,
+   "Armazém 5": 12,
+   "Kobra": 12,
+   "NAM Atlântico": 6
+  },
+  "Armazém 3": {
+   "Armazém 1": 9,
+   "Armazém 2": 5,
+   "Armazém 3": 5,
+   "Armazém 4": 5,
+   "Armazém 5": 9,
+   "Kobra": 9,
+   "NAM Atlântico": 6
+  },
+  "Armazém 4": {
+   "Armazém 1": 12,
+   "Armazém 2": 9,
+   "Armazém 3": 5,
+   "Armazém 4": 5,
+   "Armazém 5": 5,
+   "Kobra": 5,
+   "NAM Atlântico": 9
+  },
+  "Armazém 5": {
+   "Armazém 1": 15,
+   "Armazém 2": 12,
+   "Armazém 3": 9,
+   "Armazém 4": 5,
+   "Armazém 5": 5,
+   "Kobra": 5,
+   "NAM Atlântico": 13
+  },
+  "Kobra": {
+   "Armazém 1": 15,
+   "Armazém 2": 12,
+   "Armazém 3": 9,
+   "Armazém 4": 5,
+   "Armazém 5": 5,
+   "Kobra": 5,
+   "NAM Atlântico": 13
+  },
+  "NAM Atlântico": {
+   "Armazém 1": 9,
+   "Armazém 2": 6,
+   "Armazém 3": 6,
+   "Armazém 4": 9,
+   "Armazém 5": 13,
+   "Kobra": 13,
+   "NAM Atlântico": 5
+  }
+ },
+ "regras": {
+  "lotacao": "2x sobre o tempo do Google (evento cheio)",
+  "buffer_saida_palco": "+2 min em toda troca",
+  "piso_minimo": "5 min em qualquer troca de palco, mesmo no mesmo prédio",
+  "formula": "tempo = max(5, base_com_lotacao + 2)",
+  "mesmo_palco": "0 — se a próxima palestra é no MESMO palco, sem caminhada (tratar no app comparando o campo palco)"
+ }
+}
