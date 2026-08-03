@@ -263,12 +263,10 @@ Como usar na aba Agenda:
 3. A matriz é fácil de reeditar em `distancias.json` (ver `regras` no arquivo) se quiser ajustar depois.
 
 ## Seção 6 — PostHog (pixel de acesso)
-**Status: ⬜ A fazer — bloqueada (aguarda project key da Carla).**
-Objetivo: só saber se tem gente acessando.
-Próximos passos:
-1. Adicionar o snippet padrão do PostHog no `index.html` com a **project API key** (é pública, pode ir no código).
-2. Manter simples: pageview/autocapture. (Opcional: evento ao salvar/agendar.)
-3. Deixar um placeholder claro (`POSTHOG_KEY = "..."`) até a key chegar.
+**Status: ✅ Feita (2026-08-03).** Snippet padrão do PostHog no `<head>` do `site/index.html` com a
+project API key da Carla, `api_host: https://us.i.posthog.com`, `person_profiles: identified_only`.
+Pageview + autocapture (autocapture já cobre cliques nos botões de salvar/agenda, sem evento custom).
+Testado local (headless Chrome): página carrega, título correto, sem erro de app no console.
 
 ## Seção 7 — Deploy no Netlify (a partir do GitHub)
 **Status: ⬜ A fazer.**
@@ -285,7 +283,7 @@ Próximos passos:
 ## Pendências com a Carla
 - [x] ~~Mapa oficial do evento (distâncias)~~ — recebido; matriz calibrada (Seção 5 / `distancias.json`).
 - [x] ~~Arquivo da imagem da planta~~ — salvo em `site/assets/mapa-evento.webp` (Seção 4B).
-- [ ] Project API key do PostHog (Seção 6).
+- [x] ~~Project API key do PostHog~~ — recebida e implementada (Seção 6).
 - [ ] Conectar o repo no painel do Netlify (Seção 7) — só ela tem acesso.
 - [ ] Confirmar que abre o repo no claude.ai/code pelo celular (Seção 0B, passo 7).
 - [ ] **Decidir:** exportar/importar agenda (colar um texto pra levar de um aparelho pro outro).
