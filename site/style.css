@@ -531,3 +531,79 @@ body {
   padding: 0 10px;
   font-size: 12px;
 }
+
+/* ---------- aba Mapa (Seção 4B) — planta oficial com zoom/pan ---------- */
+.mapa__lembrete {
+  background: var(--superficie-card);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-card);
+  padding: 12px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--texto-secundario);
+}
+
+.mapa__controles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.mapa__controles .botao {
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+.mapa__zoom-rotulo {
+  min-width: 48px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--texto-secundario);
+}
+
+/* pan por scroll/arraste nativo (-webkit-overflow-scrolling pro momentum
+   no iOS); o zoom pinça nativo do navegador continua funcionando por
+   cima disso — não usamos touch-action:none em lugar nenhum. Fundo
+   claro fixo (não segue o tema) pra planta não "brilhar" no dark mode. */
+.mapa__zoom-container {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  max-height: 65vh;
+  background: #F1F2F4;
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-card);
+  padding: 8px;
+  margin-bottom: 12px;
+}
+
+.mapa__imagem {
+  display: block;
+  height: auto;
+  width: 100%; /* nível de zoom inicial (100%); os botões trocam via JS */
+}
+
+.mapa__legenda {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--superficie-card);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-card);
+}
+
+.mapa__legenda li {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--texto-secundario);
+  border-bottom: 1px solid var(--divisoria);
+}
+
+.mapa__legenda li:last-child {
+  border-bottom: none;
+}
+
+.mapa__legenda strong {
+  color: var(--texto-primario);
+}

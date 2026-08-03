@@ -1096,8 +1096,95 @@
     renderizarAgenda();
   }
 
+  // -----------------------------------------------------------
+  // Seção 4B — Aba Mapa: planta oficial com zoom/pan simples
+  // (sem lib externa) + legenda dos 7 nós da matriz de distância.
+  // -----------------------------------------------------------
+
+  // níveis de zoom = % da largura do container (não da tela); o pan
+  // em si é o scroll nativo do container (overflow:auto), inclusive
+  // pinch-to-zoom nativo do navegador — não bloqueamos com touch-action.
+  var NIVEIS_ZOOM_MAPA = [100, 200, 400];
+  var indiceZoomMapa = 0;
+  var mapaInicializado = false;
+
+  function aplicarZoomMapa(indice) {
+    indiceZoomMapa = Math.max(0, Math.min(NIVEIS_ZOOM_MAPA.length - 1, indice));
+    var img = document.getElementById('mapa-imagem');
+    var rotulo = document.getElementById('mapa-zoom-rotulo');
+    if (img) img.style.width = NIVEIS_ZOOM_MAPA[indiceZoomMapa] + '%';
+    if (rotulo) rotulo.textContent = NIVEIS_ZOOM_MAPA[indiceZoomMapa] + '%';
+  }
+
+  // delegação de eventos: um único listener no container da aba Mapa
+  function aoClicarMapa(evento) {
+    var botao = evento.target.closest('button[data-zoom]');
+    if (!botao) return;
+    var acao = botao.getAttribute('data-zoom');
+    if (acao === 'menos') aplicarZoomMapa(indiceZoomMapa - 1);
+    else if (acao === 'mais') aplicarZoomMapa(indiceZoomMapa + 1);
+    else if (acao === 'ajustar') aplicarZoomMapa(0);
+  }
+
+  // legenda dos 7 nós da matriz (Seção 5) em linguagem de quem está
+  // andando pelo evento. Só afirma o que o PLANO.md afirma (Seção 4B/5):
+  // Armazéns 1–5 em fila; Kobra recuado atrás do 4-5; NAM Atlântico
+  // atracado na frente do 2-3; Armazém 5 inclui a varanda do Vital de Oliveira.
+  function construirHtmlLegendaMapa() {
+    var html = '<ul class="mapa__legenda">';
+    // descrições conferidas contra a planta oficial (site/assets/mapa-evento.webp)
+    html += '<li><strong>Armazém 1</strong> — ponta esquerda do píer, perto da Praça Mauá e da ' +
+      'entrada principal. Dividido em 1A (RIW Pop Tech), 1B e a varanda.</li>';
+    html += '<li><strong>Armazém 2</strong> — logo depois do 1B, na sequência do píer.</li>';
+    html += '<li><strong>Armazém 3</strong> — no meio da fila, entre a Praça 2-3 e a Praça 3-4.</li>';
+    html += '<li><strong>Armazém 4</strong> — depois do 3; é da Praça 3-4 que sai o acesso ao Kobra.</li>';
+    html += '<li><strong>Armazém 5</strong> — o último da fila, do lado do MAR. Inclui a varanda do ' +
+      'navio <em>Vital de Oliveira</em>, atracado ali na frente.</li>';
+    html += '<li><strong>Kobra</strong> — o Galpão Kobra, recuado atrás dos Armazéns 3, 4 e 5; ' +
+      'acesso pela Praça 3-4.</li>';
+    html += '<li><strong>NAM Atlântico</strong> — o navio laranja atracado em frente aos Armazéns 1B ' +
+      'e 2; acesso pela Praça 2-3.</li>';
+    html += '</ul>';
+    return html;
+  }
+
+  function construirHtmlMapa() {
+    var html = '';
+    html += '<p class="mapa__lembrete">🚶 A matriz de tempo de caminhada (usada na aba Agenda) já ' +
+      'considera lotação e buffer de saída de palco.</p>';
+
+    html += '<div class="mapa__controles" role="group" aria-label="Zoom do mapa">';
+    html += '<button type="button" class="botao botao--secundario" data-zoom="menos" aria-label="Diminuir zoom">−</button>';
+    html += '<span id="mapa-zoom-rotulo" class="mapa__zoom-rotulo">100%</span>';
+    html += '<button type="button" class="botao botao--secundario" data-zoom="mais" aria-label="Aumentar zoom">+</button>';
+    html += '<button type="button" class="botao botao--secundario" data-zoom="ajustar">Ajustar</button>';
+    html += '</div>';
+
+    // a imagem só entra no DOM aqui — ou seja, só baixa quando a aba
+    // Mapa é aberta pela primeira vez (são 534KB, não vale a pena antes).
+    html += '<div class="mapa__zoom-container" id="mapa-zoom-container">';
+    html += '<img id="mapa-imagem" class="mapa__imagem" src="assets/mapa-evento.webp" ' +
+      'alt="Planta oficial da Rio Innovation Week 2026: os Armazéns 1 a 5, o Galpão Kobra, ' +
+      'o navio NAM Atlântico e a legenda dos palcos de cada prédio." ' +
+      'width="4125" height="2250" loading="lazy" decoding="async">';
+    html += '</div>';
+
+    html += construirHtmlLegendaMapa();
+    return html;
+  }
+
+  // renderMapa() — monta o conteúdo só na primeira vez que a aba abre
+  // (guardado por mapaInicializado); reabrir a aba não duplica a
+  // imagem nem os listeners, só reaproveita o que já está no DOM.
   function renderMapa() {
-    // stub — implementado na Seção 4B do PLANO.md
+    var elConteudo = document.getElementById('mapa-conteudo');
+    if (!elConteudo) return;
+
+    if (!mapaInicializado) {
+      elConteudo.innerHTML = construirHtmlMapa();
+      elConteudo.addEventListener('click', aoClicarMapa);
+      mapaInicializado = true;
+    }
   }
 
   var RENDERERS = {

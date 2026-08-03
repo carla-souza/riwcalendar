@@ -168,7 +168,10 @@ Próximos passos:
 4. **Remover da agenda** (mantém salva). (Bom ter) atalho "ver outras salvas nesse horário" pro cenário de fila/lotação.
 
 ## Seção 4B — Aba Mapa (referência visual)
-**Status: ⬜ A fazer — imagem já disponível.**
+**Status: ✅ Feita.** Planta com pan por scroll nativo + zoom 100/200/400% (botões −/+/Ajustar);
+pinch nativo continua liberado. A imagem (534 KB) só baixa quando a aba abre. Legenda dos 7 nós
+conferida contra a planta oficial (praças de acesso, Kobra recuado, NAM Atlântico em frente ao 1B/2,
+varanda do *Vital de Oliveira* no Armazém 5).
 Objetivo: mostrar a planta oficial do evento como referência pra se localizar entre prédios e palcos.
 Arquivo: **`site/assets/mapa-evento.webp`** (já salvo; 4125×2250, ~534KB — planta oficial completa com legenda dos palcos).
 Próximos passos:
