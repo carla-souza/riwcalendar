@@ -269,14 +269,22 @@ Pageview + autocapture (autocapture já cobre cliques nos botões de salvar/agen
 Testado local (headless Chrome): página carrega, título correto, sem erro de app no console.
 
 ## Seção 7 — Deploy no Netlify (a partir do GitHub)
-**Status: ⬜ A fazer.**
-Próximos passos:
-1. No Netlify: **"Add new site → Import from Git"**, escolher o repo `riwcalendar` (Seção 0B).
-   Configuração: **build command vazio** (não tem build) e **publish directory = `site`**.
-   A partir daí, todo `push` na `main` republica sozinho — inclusive os pushes feitos do celular.
-2. (Alternativa de emergência, se o Git travar) drag-and-drop da pasta `site/` no Netlify.
-3. Testar no celular: filtros, salvar, agenda, conflitos, distância, persistência ao recarregar.
-4. Passar o link pra Carla; ela compartilha com outros participantes.
+**Status: ✅ Feita (2026-08-03).** Site no ar: **https://riwcalendar.netlify.app**. Achamos e
+corrigimos dois problemas no meio do caminho: (1) o "Publish directory" tinha ficado "Not set" no
+Netlify — corrigido pra `site`, sem build command; (2) havia 3 commits locais nunca enviados pro
+GitHub (troca da aba Salvas por filtro + ícones + PostHog), então o deploy publicava uma versão
+velha — resolvido com `git push`. Depois do redeploy, verificado no ar: título e as 3 abas certas,
+`data.json`/`distancias.json`/assets 200, **342 palestras** filtradas pro dia 04/08 renderizando com
+filtros/chips/busca, botões "Tenho interesse"/"Adicionar na agenda", snippet do PostHog presente.
+Visual conferido em desktop e em iframe real de 320px (mobile) — sem overflow nem corte
+(headless `--window-size` sozinho não presta pra isso, é preciso o iframe — ver nota na Orquestração).
+Próximos passos (o que falta, é rotina, não bloqueia nada):
+1. Testar no **celular de verdade** (rede, toque, teclado) — o teste automatizado cobre layout/dados,
+   não interação real.
+2. Passar o link pra outros participantes quando ela quiser.
+3. **Lembrete permanente:** deploy contínuo só pega o que está em `origin/main`. Depois de qualquer
+   sessão de ajustes, confirmar que os commits foram **empurrados** (`git push`), não só criados
+   localmente — foi exatamente isso que atrasou este deploy.
 
 ---
 
@@ -284,7 +292,7 @@ Próximos passos:
 - [x] ~~Mapa oficial do evento (distâncias)~~ — recebido; matriz calibrada (Seção 5 / `distancias.json`).
 - [x] ~~Arquivo da imagem da planta~~ — salvo em `site/assets/mapa-evento.webp` (Seção 4B).
 - [x] ~~Project API key do PostHog~~ — recebida e implementada (Seção 6).
-- [ ] Conectar o repo no painel do Netlify (Seção 7) — só ela tem acesso.
+- [x] ~~Conectar o repo no painel do Netlify~~ — feito; site no ar em https://riwcalendar.netlify.app (Seção 7).
 - [ ] Confirmar que abre o repo no claude.ai/code pelo celular (Seção 0B, passo 7).
 - [ ] **Decidir:** exportar/importar agenda (colar um texto pra levar de um aparelho pro outro).
   Ideia levantada em 2026-08-03, **não aprovada** — não implementar sem ela pedir.
