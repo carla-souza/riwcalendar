@@ -25,6 +25,41 @@ Os sub-agentes que fazem o código rodam em Sonnet** (mais barato). Fluxo:
 Notas: sub-agentes começam "frios" — por isso o prompt precisa apontar os documentos. Prefira poucas
 seções grandes a muitas tarefinhas (o custo de reler os docs se paga melhor assim). Mantenha o lean.
 
+### Ajustes pedidos pela Carla depois das seções (vale pra sempre)
+Combinado em 2026-08-03: **o fluxo compilar → executar → verificar → chamar vale pra qualquer ajuste
+na aplicação**, não só pras seções do plano. Sempre que a Carla pedir uma mudança:
+1. **Compile o pedido dela.** Se ela avisar que vem mais de uma mensagem, **espere ela dizer que
+   acabou** antes de despachar (pedido explícito dela).
+2. **Escolha o executor por tamanho** (limiar aprovado pela Carla em 2026-08-03 — ela não precisa
+   classificar nada, o orquestrador decide e **avisa qual caminho tomou**):
+   - **Sub-agente em Sonnet** (`Agent` com `model: "sonnet"`, prompt auto-contido apontando
+     `CLAUDE.md` + `PLANO.md` + `DESIGN.md`) quando a mudança **exige explorar código**, mexe em
+     **vários arquivos** ou é uma **seção/redesenho** (ex.: o grid da Agenda estilo Google Calendar).
+   - **O próprio orquestrador** quando é **cirúrgico e o arquivo já está no contexto dele**
+     (ex.: reordenar o modal, ajustar um texto, corrigir uma constante). Passar isso por sub-agente
+     custa mais: ele começa frio, relê tudo, e o orquestrador ainda revisa o diff depois.
+   - Critério de desempate: **contexto do orquestrador é recurso escasso**. Se a tarefa for gerar ou
+     ler MUITO código, delegue — mantém o orquestrador vivo mais tempo (esta sessão já compactou uma
+     vez). Se for pequena, fazer direto é mais barato e mais rápido.
+3. **O orquestrador (Opus) testa SEMPRE, nos dois caminhos, antes de chamar a Carla** — este é o
+   passo que protege a qualidade, não o passo 2. Rodar o site e olhar não basta: os testes dos
+   próprios sub-agentes já deixaram passar bug visual mais de uma vez. Use o loop abaixo.
+4. Só então chame a Carla, dizendo **o que foi verificado e como**.
+5. Registre a decisão de produto no `PLANO.md` (na seção certa) e commite.
+
+### Loop de verificação do orquestrador (o que realmente pega bug)
+Servidor: `cd site && python3 -m http.server 8080 --bind 0.0.0.0` (o `--bind 0.0.0.0` é o que
+permite abrir do celular pelo IP da rede; com `127.0.0.1` só a própria máquina enxerga).
+- **Funcional:** página de teste temporária dentro de `site/` que seta o `localStorage`, monta o
+  cenário e escreve o resultado num `<div id="rt">`; ler com Chrome headless
+  (`--headless --dump-dom --virtual-time-budget=6000`) e extrair a div. Funções puras estão expostas
+  em `window.RIW` (`avaliarTrecho`, `acharConflitos`, `posicionarNoGrid`, `filtrarPalestras`…).
+- **Visual:** `--screenshot` e **olhar a imagem** — foi assim que apareceram card invisível, texto
+  cortado no meio da linha e o desalinhamento com as linhas de hora.
+- **Overflow no mobile:** medir dentro de um `<iframe>` de 320px (o headless novo ignora
+  `--window-size` pro viewport de layout).
+- **Sempre apagar as páginas de teste** antes do commit.
+
 ---
 
 ## Contexto travado (não mudar sem combinar com a Carla)
