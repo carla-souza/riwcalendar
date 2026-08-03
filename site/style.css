@@ -205,6 +205,9 @@ body {
   box-shadow: var(--sombra-card);
   padding: 12px;
   margin-bottom: 12px;
+  /* offset pro scrollIntoView das pills de horário não deixar o card
+     colado embaixo da barra fixa (ver .horarios-pills). */
+  scroll-margin-top: 52px;
 }
 
 .card__badge-trilha {
@@ -489,6 +492,37 @@ body {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ---------- pills de horário: âncoras fixas no topo do scroll ---------- */
+/* ficam no topo da lista de resultados (dentro de #programacao-conteudo,
+   que rola junto com o body) e grudam no topo da tela assim que o scroll
+   passa delas — só existe .abas fixa (embaixo), então top:0 aqui não
+   disputa espaço com mais nada fixo no topo. */
+.horarios-pills {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 8px 2px;
+  margin: 0 -2px 12px;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--divisoria);
+  /* some no fim da barra em vez de cortar a última pill pela metade */
+  -webkit-mask-image: linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent);
+  mask-image: linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent);
+}
+
+.chip--horario {
+  flex: 0 0 auto;
+  min-height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
   white-space: nowrap;
 }
 

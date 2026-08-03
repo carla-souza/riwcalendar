@@ -576,7 +576,9 @@
   // -----------------------------------------------------------
   // Programação — lista de resultados (cards) + delegação
   // -----------------------------------------------------------
-  function construirHtmlCard(p) {
+  // idHorario: setado só no primeiro card de cada horário (âncora das
+  // pills fixas no topo — ver construirHtmlPillsHorarios).
+  function construirHtmlCard(p, idHorario) {
     var cor = corDaTrilha(p.trilha);
     var salva = isSalva(p.id);
     var agendada = naAgenda(p.id);
@@ -590,7 +592,8 @@
         .filter(Boolean).join(', ');
     }
 
-    var html = '<article class="card" data-card-id="' + p.id + '">';
+    var html = '<article class="card" data-card-id="' + p.id + '"' +
+      (idHorario ? ' id="' + idHorario + '"' : '') + '>';
     html += '<span class="card__badge-trilha" style="background:' + cor + '">' +
       escaparHtml(normalizarTrilha(p.trilha)) + '</span>';
     html += '<div class="card__horario">' + escaparHtml(p.inicio) + '–' + escaparHtml(p.fim) + '</div>';
@@ -615,12 +618,79 @@
     return html;
   }
 
+  // âncora do primeiro card de cada horário — id estável, sem os dois
+  // pontos (inválido puro em id, mas evitamos mesmo assim).
+  function idHorarioAncora(horario) {
+    return 'horario-' + String(horario).replace(':', '');
+  }
+
   // a lista sempre mostra um único dia por vez agora (o filtro de dia da
   // Programação não produz mais 'todos' via UI), então não agrupa mais por
   // cabeçalho de dia — só concatena os cards. O cabeçalho "Exibindo N
-  // palestras" fica por conta de renderizarListaResultados().
+  // palestras" fica por conta de renderizarListaResultados(). Marca o
+  // primeiro card de cada horário com um id (âncora das pills fixas).
   function construirHtmlLista(itens) {
-    return itens.map(construirHtmlCard).join('');
+    var horarioAnterior = null;
+    return itens.map(function (p) {
+      var primeiroDoHorario = p.inicio !== horarioAnterior;
+      horarioAnterior = p.inicio;
+      return construirHtmlCard(p, primeiroDoHorario ? idHorarioAncora(p.inicio) : null);
+    }).join('');
+  }
+
+  // pills pequenas com os horários do dia (na ordem em que aparecem),
+  // fixas no topo do scroll — cada uma pula pro primeiro card daquele
+  // horário. Construídas a partir do resultado INTEIRO (não só da fatia
+  // visível/paginada), senão horários mais tarde no dia nunca apareceriam
+  // como pill antes do usuário clicar em "carregar mais".
+  function construirHtmlPillsHorarios(itens) {
+    var vistos = {};
+    var horarios = [];
+    itens.forEach(function (p) {
+      if (!vistos[p.inicio]) {
+        vistos[p.inicio] = true;
+        horarios.push(p.inicio);
+      }
+    });
+    if (horarios.length === 0) return '';
+
+    var html = '<div class="horarios-pills">';
+    horarios.forEach(function (h) {
+      html += '<button type="button" class="chip chip--horario" data-horario="' +
+        escaparHtml(h) + '">' + escaparHtml(h) + '</button>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  // clique numa pill de horário: rola até o primeiro card daquele horário.
+  // Se ainda não foi renderizado (além da paginação atual), estende
+  // qtdVisivel até cobrir esse horário antes de rolar.
+  function irParaHorario(horario) {
+    var idAlvo = idHorarioAncora(horario);
+    var elAlvo = document.getElementById(idAlvo);
+    if (!elAlvo) {
+      var filtros = {
+        dia: filtroEstado.dia,
+        trilha: filtroEstado.trilha,
+        predio: filtroEstado.predio,
+        tipo: filtroEstado.tipo,
+        busca: filtroEstado.busca,
+        interesse: filtroEstado.interesse,
+        idsInteresse: getState().salvas
+      };
+      var resultado = filtrarPalestras(PALESTRAS, filtros);
+      var indice = resultado.findIndex(function (p) { return p.inicio === horario; });
+      if (indice === -1) return;
+      // renderiza uma folga de mais uma página além do alvo — só até
+      // o alvo faria o documento terminar bem ali, sem espaço embaixo
+      // pro scrollIntoView rolar o card até o topo (o navegador trava
+      // no fim da página).
+      qtdVisivel = Math.max(qtdVisivel, indice + 1 + TAMANHO_PAGINA);
+      renderizarListaResultados();
+      elAlvo = document.getElementById(idAlvo);
+    }
+    if (elAlvo) elAlvo.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // atualiza só os botões de UM card, sem re-renderizar a lista inteira
@@ -648,6 +718,12 @@
 
   // delegação de eventos: um único listener no container da lista
   function aoClicarLista(evento) {
+    var pillHorario = evento.target.closest('.chip--horario');
+    if (pillHorario) {
+      irParaHorario(pillHorario.getAttribute('data-horario'));
+      return;
+    }
+
     var botao = evento.target.closest('button[data-acao]');
     if (!botao) return;
     var id = Number(botao.getAttribute('data-id'));
@@ -697,6 +773,11 @@
     // essa informação e foi removido).
     var html = '<h3 class="lista__cabecalho-dia">Exibindo ' + resultado.length +
       (resultado.length === 1 ? ' palestra' : ' palestras') + '</h3>';
+    // pills de horário, fixas no topo do scroll assim que passam por ele
+    // (ver CSS .horarios-pills) — construídas a partir do resultado
+    // inteiro, não só da fatia visível, pra já mostrar os horários mais
+    // tarde do dia.
+    html += construirHtmlPillsHorarios(resultado);
     html += construirHtmlLista(visiveis);
 
     if (resultado.length > visiveis.length) {
