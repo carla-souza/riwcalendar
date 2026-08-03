@@ -204,7 +204,7 @@ body {
   border-radius: var(--raio);
   box-shadow: var(--sombra-card);
   padding: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .card__badge-trilha {
@@ -239,7 +239,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 14px;
 }
 
 /* botões do card ocupam só a largura do próprio conteúdo (ícone + label),
@@ -458,10 +458,6 @@ body {
   font-size: 13px;
   font-weight: 700;
   color: var(--texto-secundario);
-}
-
-.lista__cabecalho-dia:first-child {
-  margin-top: 0;
 }
 
 .lista__vazio {
