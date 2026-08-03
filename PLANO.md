@@ -155,9 +155,22 @@ Próximos passos:
 
 ## Seção 4 — Aba Agenda (executar no dia)
 **Status: ✅ Feita.** Timeline enxuta por dia, conflito em vermelho (mais grave que o âmbar das Salvas),
-aviso de distância ENTRE os cards (`ok`/`apertado`/`impossivel`), "Remover da agenda" (mantém salva) e
+aviso de distância ENTRE os cards, "Remover da agenda" (mantém salva) e
 o atalho `<details>` "Ver outras salvas nesse horário" com "+ Agenda" pra troca rápida.
 `window.RIW.avaliarTrecho(ant, seg, matriz) → { custo, folga, nivel, mesmoPalco, de, para }`.
+
+**Card de intervalo (ajustado com a Carla em 2026-08-03) — duas linhas:**
+`🚶 ~X min de caminhada (De → Para)` + `⏰ ...`. Níveis e cores:
+| condição | nivel | cor | linha 2 |
+|---|---|---|---|
+| mesmo palco | `ok` | não renderiza card | — |
+| `folga − custo >= 10` | `ok` | cinza | `Você tem X min de intervalo` |
+| `folga >= custo` e sobra `< 10` | `apertado` | âmbar | `Você tem X min de intervalo` |
+| `folga >= 0` e `folga < custo` | `atrasado` | âmbar | `Você vai chegar com N min de atraso` |
+| `folga < 0` (sobreposição real) | `impossivel` | vermelho | `Você não vai chegar a tempo` |
+Regra da dona: **atraso causado só por deslocamento é âmbar**; vermelho só quando os horários se
+sobrepõem de verdade. O selo "⚠ Conflito de horário" dentro do card também só aparece em
+sobreposição real (`acharConflitos`, regra estrita — encostadas não conflitam).
 ⚠️ **A matriz agora existe em DOIS lugares:** `distancias.json` (raiz) e `site/distancias.json` (a que o
 app carrega). Ao reeditar a matriz, **copie pra `site/`** — só a pasta `site/` vai pro Netlify.
 Objetivo: o plano final, enxuto, com os alertas.

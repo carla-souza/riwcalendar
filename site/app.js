@@ -820,11 +820,18 @@
   // - custo: 0 se mesmoPalco; senão matriz[predio_base_ant][predio_base_seg];
   //   null se a matriz não tiver esse par (dado desconhecido — não inventa número).
   // - folga: minutos(seguinte.inicio) − minutos(anterior.fim). Pode ser
-  //   negativa quando as palestras se sobrepõem.
-  // - nivel: 'impossivel' (folga < custo — alerta forte, vermelho),
-  //   'apertado' (folga >= custo mas folga − custo < 10 — aviso âmbar),
-  //   'ok' (folga sobra, custo desconhecido, ou mesmoPalco — nesse
-  //   último caso "sem aviso nenhum" vale como 'ok', não se avalia risco).
+  //   negativa quando as palestras se sobrepõem de verdade.
+  // - nivel (pedido da Carla após testar a Agenda — atraso causado só
+  //   pelo deslocamento é ÂMBAR, não vermelho; vermelho fica reservado
+  //   pra quando os HORÁRIOS realmente se sobrepõem):
+  //     'ok'        — mesmoPalco, custo desconhecido, ou folga − custo >= 10.
+  //     'apertado'  — folga >= custo mas folga − custo < 10 (dá tempo, é
+  //                   só correria). Âmbar.
+  //     'atrasado'  — folga >= 0 mas folga < custo: os horários NÃO se
+  //                   sobrepõem, mas o deslocamento sozinho causa atraso
+  //                   na chegada. Âmbar (não é culpa da programação).
+  //     'impossivel'— folga < 0: as palestras se sobrepõem de verdade.
+  //                   Vermelho.
   // - de/para: predio_base de origem/destino, pra montar o rótulo
   //   "Armazém 1 → Kobra".
   function avaliarTrecho(anterior, seguinte, matriz) {
@@ -849,8 +856,10 @@
       nivel = 'ok'; // mesmo palco: fica no lugar, sem aviso — nunca é risco
     } else if (custo == null) {
       nivel = 'ok'; // sem dado de distância — não alarma
+    } else if (folga < 0) {
+      nivel = 'impossivel'; // sobreposição real de horário
     } else if (folga < custo) {
-      nivel = 'impossivel';
+      nivel = 'atrasado'; // não sobrepõe, mas o deslocamento causa atraso
     } else if (folga - custo < 10) {
       nivel = 'apertado';
     } else {
@@ -934,35 +943,47 @@
   }
 
   // construirHtmlTrecho(avaliacao) — o aviso vive ENTRE dois cards, não
-  // dentro deles. Mesmo palco: sem linha nenhuma (não polui a timeline).
+  // dentro deles. Mesmo palco: sem card nenhum (não polui a timeline).
+  // Duas linhas fixas (pedido da Carla, pra ficar fácil de ler correndo):
+  //   linha 1: "🚶 ~X min de caminhada (De → Para)" — sempre.
+  //   linha 2: "⏰ ..." com um dos 3 textos (intervalo / atraso / não
+  //   vai chegar a tempo), conforme avaliacao.nivel.
   function construirHtmlTrecho(avaliacao) {
     if (avaliacao.mesmoPalco) return '';
 
-    var texto;
+    // mesmo prédio (só troca de palco) não vira "Armazém 3 → Armazém 3"
+    var mesmoPredio = avaliacao.de === avaliacao.para;
+    var rota = mesmoPredio
+      ? 'outro palco no ' + escaparHtml(avaliacao.de)
+      : escaparHtml(avaliacao.de) + ' → ' + escaparHtml(avaliacao.para);
+
+    var linha1;
     if (avaliacao.custo == null) {
       // dado desconhecido: avisa que são prédios diferentes sem inventar minutos
-      texto = '🚶 ' + escaparHtml(avaliacao.de) + ' → ' + escaparHtml(avaliacao.para) +
-        ' — distância desconhecida';
+      linha1 = '🚶 Caminhada (' + rota + ') — prédios diferentes, tempo desconhecido';
     } else {
-      // mesmo prédio (só troca de palco) não vira "Armazém 3 → Armazém 3"
-      var rota = avaliacao.de === avaliacao.para
-        ? 'outro palco no ' + escaparHtml(avaliacao.de)
-        : escaparHtml(avaliacao.de) + ' → ' + escaparHtml(avaliacao.para);
-      texto = '🚶 ~' + avaliacao.custo + ' min — ' + rota;
-      if (avaliacao.folga >= 0) {
-        texto += ' · ' + avaliacao.folga + ' min de folga';
-      } else {
-        texto += ' · se sobrepõe em ' + Math.abs(avaliacao.folga) + ' min';
-      }
-      if (avaliacao.nivel === 'impossivel') {
-        texto += ' — ⚠ Não dá tempo: precisa de ~' + avaliacao.custo + ' min' +
-          (avaliacao.folga >= 0 ? ' e só tem ' + avaliacao.folga : '') + '.';
-      } else if (avaliacao.nivel === 'apertado') {
-        texto += ' — corre que dá.';
-      }
+      linha1 = '🚶 ~' + avaliacao.custo + ' min de caminhada (' + rota + ')';
     }
 
-    return '<div class="trecho trecho--' + avaliacao.nivel + '">' + texto + '</div>';
+    var linha2;
+    if (avaliacao.nivel === 'impossivel') {
+      linha2 = '⏰ Você não vai chegar a tempo';
+    } else if (avaliacao.nivel === 'atrasado') {
+      linha2 = '⏰ Você vai chegar com ' + (avaliacao.custo - avaliacao.folga) + ' min de atraso';
+    } else if (avaliacao.custo == null && avaliacao.folga < 0) {
+      // custo desconhecido e a folga já é negativa: não dá pra afirmar
+      // intervalo (folga negativa) nem calcular atraso (custo
+      // desconhecido) — melhor não mostrar a linha 2 do que inventar.
+      linha2 = '';
+    } else {
+      linha2 = '⏰ Você tem ' + avaliacao.folga + ' min de intervalo';
+    }
+
+    var html = '<div class="trecho trecho--' + avaliacao.nivel + '">';
+    html += '<div class="trecho__linha">' + linha1 + '</div>';
+    if (linha2) html += '<div class="trecho__linha">' + linha2 + '</div>';
+    html += '</div>';
+    return html;
   }
 
   // agrupa por dia e intercala os trechos de distância entre cards

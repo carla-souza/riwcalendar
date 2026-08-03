@@ -453,7 +453,8 @@ body {
   color: var(--texto-terciario);
 }
 
-/* trecho de distância: vive ENTRE dois cards, não dentro deles */
+/* trecho de distância: vive ENTRE dois cards, não dentro deles.
+   Duas linhas (caminhada + intervalo/atraso), por isso é flex column. */
 .trecho {
   margin: 6px 0;
   padding: 8px 10px;
@@ -461,6 +462,9 @@ body {
   font-size: 12px;
   font-weight: 600;
   overflow-wrap: anywhere;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .trecho--ok {
@@ -469,7 +473,11 @@ body {
   font-weight: 400;
 }
 
-.trecho--apertado {
+/* âmbar: dá tempo mas é corrido ('apertado'), ou o deslocamento sozinho
+   atrasa a chegada sem os horários se sobreporem de verdade ('atrasado').
+   Vermelho fica só pra sobreposição real de horário ('impossivel'). */
+.trecho--apertado,
+.trecho--atrasado {
   background: var(--acao-fundo-apertado, rgba(182, 92, 2, 0.14));
   color: var(--alerta-amber);
 }
