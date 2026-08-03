@@ -454,7 +454,7 @@ body {
 
 /* ---------- lista de resultados agrupada por dia ---------- */
 .lista__cabecalho-dia {
-  margin: 16px 0 8px;
+  margin: 24px 0 8px;
   font-size: 13px;
   font-weight: 700;
   color: var(--texto-secundario);
@@ -475,14 +475,15 @@ body {
 }
 
 .card__palestrantes {
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--texto-secundario);
-  margin-top: 2px;
+  margin-top: 6px;
 }
 
 /* recortada em 3 linhas pra não estourar a altura do card numa lista densa */
 .card__descricao {
-  margin: 6px 0 0;
+  margin: 14px 0 0;
   font-size: 13px;
   color: var(--texto-secundario);
   overflow: hidden;

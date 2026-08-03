@@ -566,11 +566,11 @@
     html += '<div class="card__horario">' + escaparHtml(p.inicio) + '–' + escaparHtml(p.fim) + '</div>';
     html += '<h4 class="card__titulo">' + escaparHtml(p.titulo) + '</h4>';
     html += '<div class="card__local">' + escaparHtml(local) + '</div>';
-    if (nomes) {
-      html += '<div class="card__palestrantes">' + escaparHtml(nomes) + '</div>';
-    }
     if (p.descricao) {
       html += '<p class="card__descricao">' + escaparHtml(p.descricao) + '</p>';
+    }
+    if (nomes) {
+      html += '<div class="card__palestrantes">' + escaparHtml(nomes) + '</div>';
     }
     html += '<div class="card__acoes">';
     html += '<button type="button" class="botao ' + (salva ? 'botao--ativo' : 'botao--secundario') +
