@@ -436,13 +436,9 @@ body {
   color: var(--alerta-amber);
 }
 
-/* ---------- aba Agenda (Seção 4) — conflito grave, trechos, "outras salvas" ---------- */
+/* ---------- aba Agenda (Seção 4) — trechos e selo de conflito (usados dentro do modal) ---------- */
 /* conflito DENTRO da agenda é grave (o plano diz "idealmente zero"),
    por isso vermelho — diferente do âmbar da Salvas. */
-.card--conflito-grave {
-  border-left: 4px solid var(--alerta-vermelho);
-}
-
 .card__conflito--grave {
   color: var(--alerta-vermelho);
 }
@@ -488,19 +484,8 @@ body {
   font-weight: 700;
 }
 
-/* "ver outras salvas nesse horário" — sem modal, <details> nativo */
-.agenda-item__outras {
-  margin-top: 8px;
-  font-size: 13px;
-}
-
-.agenda-item__outras summary {
-  cursor: pointer;
-  color: var(--cor-acao);
-  font-weight: 600;
-  -webkit-tap-highlight-color: transparent;
-}
-
+/* "outras salvas nesse horário" — dentro do modal de detalhes (Seção 4
+   redesenhada), sempre visível, sem <details>/<summary>. */
 .agenda-item__outras-lista {
   margin-top: 8px;
   display: flex;
@@ -614,4 +599,247 @@ body {
 
 .mapa__legenda strong {
   color: var(--texto-primario);
+}
+
+/* ---------- aba Agenda (redesenho) — grid de horários + modal de detalhes ---------- */
+/* cabeçalho: chips de dia + cabeçalho do dia + contagem reaproveitam
+   .filtros/.filtros__dias/.chip (mesmo visual da Programação) — só o
+   espaçamento extra do h3 abaixo dos chips precisa de ajuste aqui. */
+.agenda-grade__cabecalho-dia {
+  margin-top: 12px;
+}
+
+/* grid: coluna de horas fixa à esquerda + área de eventos rolável por
+   dentro (a PÁGINA nunca rola de lado, só esta área). */
+.agenda-grade {
+  display: flex;
+  align-items: flex-start;
+  background: var(--superficie-card);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-card);
+  padding: 8px 8px 8px 4px;
+}
+
+.agenda-grade__horas {
+  position: relative;
+  flex: 0 0 44px;
+  width: 44px;
+}
+
+.agenda-grade__rotulo-hora {
+  position: absolute;
+  left: 0;
+  right: 6px;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--texto-terciario);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.agenda-grade__area {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-left: 1px solid var(--divisoria);
+}
+
+.agenda-grade__eventos {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.agenda-grade__linha-hora {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--divisoria);
+}
+
+/* card resumido: neutro, com filete da cor da trilha — a cor "livre" é
+   só do chip de caminhada (regra da Carla). */
+.agenda-grade__card {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  padding: 3px 6px;
+  border: none;
+  border-left: 3px solid transparent;
+  border-radius: 6px;
+  background: var(--superficie-card);
+  box-shadow: var(--sombra-card);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.agenda-grade__card:active {
+  filter: brightness(0.95);
+}
+
+.agenda-grade__card-titulo {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--texto-primario);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.agenda-grade__card-horario {
+  font-size: 10px;
+  color: var(--texto-secundario);
+}
+
+.agenda-grade__chip-caminhada {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* mesmas cores do .trecho (Seção 4): a cor sai só do custo de caminhada,
+   nunca da folga. */
+.agenda-grade__chip-caminhada--amber {
+  background: var(--acao-fundo-apertado, rgba(182, 92, 2, 0.14));
+  color: var(--alerta-amber);
+}
+
+.agenda-grade__chip-caminhada--vermelho {
+  background: var(--acao-fundo-impossivel, rgba(201, 55, 44, 0.14));
+  color: var(--alerta-vermelho);
+}
+
+/* custo desconhecido (matriz sem o par de prédios): neutro, sem alarme */
+.agenda-grade__chip-caminhada--neutro {
+  background: var(--superficie-lista);
+  color: var(--texto-secundario);
+}
+
+/* ---------- modal de detalhes da Agenda — único elemento reaproveitado ---------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.modal[hidden] {
+  display: none;
+}
+
+.modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.modal__painel {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--superficie-card);
+  border-radius: 16px 16px 0 0;
+  box-shadow: rgba(9, 30, 66, 0.31) 0 16px 40px;
+  padding: 20px 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 640px) {
+  .modal {
+    align-items: center;
+  }
+  .modal__painel {
+    border-radius: 16px;
+  }
+}
+
+.modal__fechar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: var(--superficie-funda);
+  color: var(--texto-primario);
+  font-size: 15px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.modal__titulo {
+  margin: 8px 40px 8px 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--texto-primario);
+  overflow-wrap: anywhere;
+}
+
+.modal__palestrantes {
+  margin: 8px 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--texto-secundario);
+}
+
+.modal__meta {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--texto-terciario);
+}
+
+.modal__descricao {
+  margin: 8px 0;
+  font-size: 13px;
+  color: var(--texto-secundario);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.modal__acoes {
+  margin: 12px 0;
+}
+
+.modal__outras {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--divisoria);
+}
+
+.modal__outras-titulo {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--texto-primario);
+}
+
+.modal__outras-vazio {
+  margin: 0;
+  font-size: 13px;
+  color: var(--texto-terciario);
+}
+
+/* trava o scroll do body enquanto o modal está aberto */
+body.modal-aberto {
+  overflow: hidden;
 }

@@ -888,60 +888,6 @@
     });
   }
 
-  function construirHtmlOutrasSalvas(item, candidatas) {
-    if (!candidatas.length) return '';
-    var html = '<details class="agenda-item__outras">';
-    html += '<summary>Ver outras salvas nesse horário (' + candidatas.length + ')</summary>';
-    html += '<div class="agenda-item__outras-lista">';
-    candidatas.forEach(function (c) {
-      var local = c.predio || '';
-      if (c.palco) local += ' — ' + c.palco;
-      html += '<div class="agenda-item__outras-item">';
-      html += '<div class="agenda-item__outras-info">';
-      html += '<strong>' + escaparHtml(c.titulo) + '</strong>';
-      html += '<span>' + escaparHtml(c.inicio) + '–' + escaparHtml(c.fim) + ' · ' + escaparHtml(local) + '</span>';
-      html += '</div>';
-      html += '<button type="button" class="botao botao--secundario" data-acao="promover" data-id="' +
-        c.id + '">+ Agenda</button>';
-      html += '</div>';
-    });
-    html += '</div></details>';
-    return html;
-  }
-
-  // card enxuto da Agenda: prioriza horário e local (é a aba de
-  // executar no dia); palestrantes ficam de fora de propósito.
-  function construirHtmlCardAgenda(p, conflitantes, todasSalvas) {
-    var cor = corDaTrilha(p.trilha);
-    var temConflito = conflitantes && conflitantes.length > 0;
-
-    var local = p.predio || '';
-    if (p.palco) local += ' — ' + p.palco;
-
-    var classes = 'card agenda-item';
-    if (temConflito) classes += ' card--conflito-grave';
-
-    var html = '<article class="' + classes + '" data-card-id="' + p.id + '">';
-    html += '<span class="card__badge-trilha" style="background:' + cor + '">' +
-      escaparHtml(normalizarTrilha(p.trilha)) + '</span>';
-    html += '<div class="card__horario">' + escaparHtml(p.inicio) + '–' + escaparHtml(p.fim) + '</div>';
-    html += '<h4 class="card__titulo">' + escaparHtml(p.titulo) + '</h4>';
-    html += '<div class="card__local">' + escaparHtml(local) + '</div>';
-    if (temConflito) {
-      html += '<div class="card__conflito card__conflito--grave">⚠ Conflito de horário com ' +
-        conflitantes.length + (conflitantes.length === 1 ? ' outra palestra da agenda' : ' outras palestras da agenda') +
-        '</div>';
-    }
-    html += '<div class="card__acoes">';
-    html += '<button type="button" class="botao botao--secundario" data-acao="remover-agenda" data-id="' +
-      p.id + '">Remover da agenda</button>';
-    html += '</div>';
-    html += '<p class="agenda-item__nota">Continua nas salvas.</p>';
-    html += construirHtmlOutrasSalvas(p, candidatasMesmoHorario(p, todasSalvas));
-    html += '</article>';
-    return html;
-  }
-
   // construirHtmlTrecho(avaliacao) — o aviso vive ENTRE dois cards, não
   // dentro deles. Mesmo palco: sem card nenhum (não polui a timeline).
   // Duas linhas fixas (pedido da Carla, pra ficar fácil de ler correndo):
@@ -986,64 +932,513 @@
     return html;
   }
 
-  // agrupa por dia e intercala os trechos de distância entre cards
-  // consecutivos do MESMO dia (o par nunca cruza a virada de dia).
-  function construirHtmlTimelineAgenda(itens, conflitos, todasSalvas, matriz) {
-    var partes = [];
-    var diaAtual = null;
-    var anteriorMesmoDia = null;
-    for (var i = 0; i < itens.length; i++) {
-      var p = itens[i];
-      if (p.dia !== diaAtual) {
-        diaAtual = p.dia;
-        anteriorMesmoDia = null;
-        partes.push('<h3 class="lista__cabecalho-dia">' + escaparHtml(formatarCabecalhoDia(p.dia)) + '</h3>');
-      }
-      if (anteriorMesmoDia) {
-        partes.push(construirHtmlTrecho(avaliarTrecho(anteriorMesmoDia, p, matriz)));
-      }
-      partes.push(construirHtmlCardAgenda(p, conflitos[p.id] || [], todasSalvas));
-      anteriorMesmoDia = p;
-    }
-    return partes.join('');
+  // ESCALA_PX_MIN: pixels por minuto no grid (~64px por hora, pedido
+  // da Carla). ALTURA_MIN_CARD_PX evita que um card de 30 min (a menor
+  // duração dos dados) fique pequeno demais pra ler. LARGURA_MIN_COLUNA_PX
+  // é o mínimo por coluna quando muitos itens se sobrepõem — depois
+  // disso o grid rola por dentro (nunca a página).
+  // 80px/hora: com 64px um card de 30 min (a menor duração dos dados)
+  // não cabia chip + título e o texto ficava cortado no meio da linha.
+  var ESCALA_PX_MIN = 80 / 60;
+  var ALTURA_MIN_CARD_PX = 32;
+  var LARGURA_MIN_COLUNA_PX = 92;
+
+  function doisDigitos(n) {
+    return (n < 10 ? '0' : '') + n;
   }
 
-  // renderizarAgenda() — relê o estado do zero (sem cache); qualquer
-  // ação (remover/promover) muda membros da lista, então sempre
-  // re-renderiza a timeline inteira (conflitos e trechos mudam junto).
-  function renderizarAgenda() {
+  // hojeIso() — data de hoje no formato YYYY-MM-DD (fuso local), pra
+  // comparar com os dias do evento e escolher o dia padrão da Agenda.
+  function hojeIso() {
+    var agora = new Date();
+    return agora.getFullYear() + '-' + doisDigitos(agora.getMonth() + 1) + '-' + doisDigitos(agora.getDate());
+  }
+
+  // diaPadraoAgenda(dias) — hoje, se for um dos dias do evento; senão
+  // o primeiro dia (dias já vem ordenado por diasUnicos).
+  function diaPadraoAgenda(dias) {
+    var hoje = hojeIso();
+    return dias.indexOf(hoje) !== -1 ? hoje : dias[0];
+  }
+
+  // itensAgendaPorDia(diaIso) — só os itens da agenda daquele dia,
+  // ordenados por início. Relê o estado do zero (sem cache).
+  function itensAgendaPorDia(diaIso) {
+    var estado = getState();
+    var lista = estado.agenda.map(getPalestraPorId).filter(Boolean)
+      .filter(function (p) { return p.dia === diaIso; });
+    lista.sort(compararDiaHorario);
+    return lista;
+  }
+
+  // acharAnteriorAgenda(item, itensMesmoDia) — dentre os itens da agenda
+  // do MESMO dia que começam antes de `item`, o que tem o maior `fim`
+  // (não é necessariamente o item imediatamente anterior na lista: pode
+  // ser uma sessão paralela mais longa). null se `item` for o primeiro
+  // do dia. Usado tanto pro chip de caminhada do card quanto pro aviso
+  // de caminhada do modal — as duas telas têm que concordar.
+  function acharAnteriorAgenda(item, itensMesmoDia) {
+    var melhor = null;
+    for (var i = 0; i < itensMesmoDia.length; i++) {
+      var outro = itensMesmoDia[i];
+      if (outro.id === item.id) continue;
+      if (!(outro.inicio < item.inicio)) continue;
+      if (!melhor || outro.fim > melhor.fim) melhor = outro;
+    }
+    return melhor;
+  }
+
+  // posicionarNoGrid(itens) — função pura (exposta em window.RIW pro
+  // teste em Node). Recebe os itens de UM dia e devolve, pra cada um,
+  // { id, coluna, totalColunas }. Algoritmo em 2 passos:
+  // 1) agrupa em clusters de itens transitivamente sobrepostos (encostados
+  //    NÃO se sobrepõem — mesma regra de acharConflitos);
+  // 2) dentro de cada cluster, atribui colunas de forma gulosa: cada item
+  //    (em ordem de início) entra na primeira coluna cujo último item já
+  //    terminou; se nenhuma servir, abre coluna nova.
+  function posicionarNoGrid(itens) {
+    var lista = itens || [];
+    var resultado = [];
+    if (!lista.length) return resultado;
+
+    // ordena defensivamente por início — a função é pura e não deve
+    // presumir que quem chama nunca erra a ordem.
+    var ordenada = lista.slice().sort(function (a, b) {
+      return minutosDoHorario(a.inicio) - minutosDoHorario(b.inicio);
+    });
+
+    var clusterAtual = [];
+    var maiorFimCluster = -Infinity;
+
+    function fecharCluster() {
+      if (!clusterAtual.length) return;
+      var fimPorColuna = []; // fimPorColuna[c] = minuto em que a coluna c fica livre
+      var atribuicoes = [];
+      clusterAtual.forEach(function (item) {
+        var inicioMin = minutosDoHorario(item.inicio);
+        var fimMin = minutosDoHorario(item.fim);
+        var colocado = false;
+        for (var c = 0; c < fimPorColuna.length; c++) {
+          if (fimPorColuna[c] <= inicioMin) {
+            fimPorColuna[c] = fimMin;
+            atribuicoes.push({ id: item.id, coluna: c });
+            colocado = true;
+            break;
+          }
+        }
+        if (!colocado) {
+          fimPorColuna.push(fimMin);
+          atribuicoes.push({ id: item.id, coluna: fimPorColuna.length - 1 });
+        }
+      });
+      var totalColunas = fimPorColuna.length;
+      atribuicoes.forEach(function (a) {
+        resultado.push({ id: a.id, coluna: a.coluna, totalColunas: totalColunas });
+      });
+      clusterAtual = [];
+      maiorFimCluster = -Infinity;
+    }
+
+    ordenada.forEach(function (item) {
+      var inicioMin = minutosDoHorario(item.inicio);
+      var fimMin = minutosDoHorario(item.fim);
+      if (clusterAtual.length && inicioMin >= maiorFimCluster) {
+        fecharCluster();
+      }
+      clusterAtual.push(item);
+      if (fimMin > maiorFimCluster) maiorFimCluster = fimMin;
+    });
+    fecharCluster();
+
+    return resultado;
+  }
+
+  // calcularFaixaHoras(itens) — hora cheia do primeiro início até a hora
+  // cheia ACIMA do último fim, pra não desenhar 24h vazias no grid.
+  function calcularFaixaHoras(itens) {
+    var minInicio = Infinity;
+    var maxFim = -Infinity;
+    itens.forEach(function (p) {
+      var ini = minutosDoHorario(p.inicio);
+      var fim = minutosDoHorario(p.fim);
+      if (ini < minInicio) minInicio = ini;
+      if (fim > maxFim) maxFim = fim;
+    });
+    if (!isFinite(minInicio) || !isFinite(maxFim)) return null;
+    var horaInicio = Math.floor(minInicio / 60);
+    var horaFim = Math.ceil(maxFim / 60);
+    if (horaFim <= horaInicio) horaFim = horaInicio + 1; // guarda mínima
+    return { horaInicio: horaInicio, horaFim: horaFim };
+  }
+
+  // chip de caminhada do card resumido — regra da Carla: a cor sai só
+  // do CUSTO (tempo de caminhada), nunca da folga. custo desconhecido
+  // (matriz sem esse par) mostra "🚶 ?" em neutro, sem inventar minuto.
+  function construirHtmlChipCaminhadaGrid(anterior, item) {
+    var avaliacao = avaliarTrecho(anterior, item, MATRIZ_DISTANCIAS);
+    if (avaliacao.mesmoPalco) return '';
+
+    var nivelChip, texto;
+    if (avaliacao.custo == null) {
+      nivelChip = 'neutro';
+      texto = '🚶 ?';
+    } else if (avaliacao.custo <= 10) {
+      nivelChip = 'amber';
+      texto = '🚶 ' + avaliacao.custo + ' min';
+    } else {
+      nivelChip = 'vermelho';
+      texto = '🚶 ' + avaliacao.custo + ' min';
+    }
+    return '<span class="agenda-grade__chip-caminhada agenda-grade__chip-caminhada--' + nivelChip + '">' +
+      texto + '</span>';
+  }
+
+  // card resumido dentro do grid: só chip de caminhada (se houver) +
+  // título truncado + horário (se o card for alto o bastante). Nada de
+  // palestrantes/local/conflito aqui — isso tudo foi pro modal.
+  function construirHtmlCardGradeAgenda(p, itensMesmoDia, pos, horaInicioFaixa) {
+    var coluna = pos ? pos.coluna : 0;
+    var totalColunas = pos ? pos.totalColunas : 1;
+    var inicioMin = minutosDoHorario(p.inicio);
+    var fimMin = minutosDoHorario(p.fim);
+
+    var top = (inicioMin - horaInicioFaixa * 60) * ESCALA_PX_MIN;
+    var altura = Math.max(ALTURA_MIN_CARD_PX, (fimMin - inicioMin) * ESCALA_PX_MIN);
+    var left = (coluna / totalColunas) * 100;
+    var largura = 'calc(' + (100 / totalColunas) + '% - 2px)';
+    var cor = corDaTrilha(p.trilha);
+
+    var anterior = acharAnteriorAgenda(p, itensMesmoDia);
+    var chip = anterior ? construirHtmlChipCaminhadaGrid(anterior, p) : '';
+
+    // Quantas linhas de título cabem: calculado, não chutado por faixa de
+    // altura — senão a última linha fica cortada no meio das letras.
+    // Alturas em px do que existe dentro do card (bate com o style.css).
+    var PADDING_V = 6, ALTURA_CHIP = 18, ALTURA_LINHA = 15, ALTURA_HORARIO = 16;
+    var disponivel = altura - PADDING_V - (chip ? ALTURA_CHIP : 0);
+    var linhas = Math.max(1, Math.floor(disponivel / ALTURA_LINHA));
+    // o horário só entra se sobrar espaço DEPOIS do título (o grid já
+    // posiciona no horário certo, então ele é o primeiro a cair)
+    var horarioHtml = (disponivel - linhas * ALTURA_LINHA >= ALTURA_HORARIO)
+      ? '<span class="agenda-grade__card-horario">' + escaparHtml(p.inicio) + '</span>'
+      : '';
+
+    // fundo = cor da trilha bem clara (hex + alpha). Card branco sobre o
+    // container branco ficava invisível; o chip de caminhada continua
+    // sendo a única cor forte (âmbar/vermelho), então ele ainda salta.
+    var html = '<button type="button" class="agenda-grade__card" data-id="' + p.id + '" ' +
+      'style="top:' + top + 'px; height:' + altura + 'px; left:' + left + '%; width:' + largura +
+      '; border-left-color:' + cor + '; background:' + cor + '2E" ' +
+      'aria-label="' + escaparHtml(p.titulo) + ', ' + escaparHtml(p.inicio) + ' às ' + escaparHtml(p.fim) + '">';
+    html += chip;
+    html += '<span class="agenda-grade__card-titulo" style="-webkit-line-clamp:' + linhas + '">' +
+      escaparHtml(p.titulo) + '</span>';
+    html += horarioHtml;
+    html += '</button>';
+    return html;
+  }
+
+  // grid do dia: coluna de horas + área de eventos com hairlines a cada
+  // hora e os cards posicionados por posicionarNoGrid.
+  function construirHtmlGradeAgenda(itens) {
+    var faixa = calcularFaixaHoras(itens);
+    var alturaTotal = (faixa.horaFim - faixa.horaInicio) * 60 * ESCALA_PX_MIN;
+
+    var posicoes = posicionarNoGrid(itens);
+    var mapaPos = {};
+    posicoes.forEach(function (p) { mapaPos[p.id] = p; });
+
+    var maxColunas = 1;
+    posicoes.forEach(function (p) { if (p.totalColunas > maxColunas) maxColunas = p.totalColunas; });
+
+    var rotulos = '';
+    var linhas = '';
+    for (var h = faixa.horaInicio; h <= faixa.horaFim; h++) {
+      var top = (h - faixa.horaInicio) * 64;
+      linhas += '<div class="agenda-grade__linha-hora" style="top:' + top + 'px"></div>';
+      if (h < faixa.horaFim) {
+        rotulos += '<div class="agenda-grade__rotulo-hora" style="top:' + top + 'px">' +
+          doisDigitos(h) + ':00</div>';
+      }
+    }
+
+    var cardsHtml = itens.map(function (p) {
+      return construirHtmlCardGradeAgenda(p, itens, mapaPos[p.id], faixa.horaInicio);
+    }).join('');
+
+    var html = '<div class="agenda-grade">';
+    html += '<div class="agenda-grade__horas" style="height:' + alturaTotal + 'px">' + rotulos + '</div>';
+    html += '<div class="agenda-grade__area">';
+    html += '<div class="agenda-grade__eventos" style="height:' + alturaTotal + 'px; min-width:' +
+      (maxColunas * LARGURA_MIN_COLUNA_PX) + 'px">';
+    html += linhas;
+    html += cardsHtml;
+    html += '</div></div></div>';
+    return html;
+  }
+
+  // cabeçalho da Agenda: chips de dia (sem "Todos" — a Agenda mostra um
+  // dia por vez) + cabeçalho do dia + contagem.
+  function construirHtmlCabecalhoAgenda(dias, diaSelecionado, qtdNoDia) {
+    var html = '<div class="filtros">';
+    html += '<div class="filtros__dias" role="group" aria-label="Selecionar dia da agenda">';
+    dias.forEach(function (d) {
+      var partes = d.split('-');
+      var ativo = d === diaSelecionado;
+      html += '<button type="button" class="chip' + (ativo ? ' chip--ativo' : '') + '" ' +
+        'data-dia-agenda="' + d + '" aria-pressed="' + ativo + '">' + partes[2] + '/' + partes[1] + '</button>';
+    });
+    html += '</div>';
+    html += '<h3 class="lista__cabecalho-dia agenda-grade__cabecalho-dia">' +
+      escaparHtml(formatarCabecalhoDia(diaSelecionado)) + '</h3>';
+    html += '<p class="filtros__contagem">' + qtdNoDia + ' na agenda nesse dia</p>';
+    html += '</div>';
+    return html;
+  }
+
+  var agendaDiaSelecionado = null; // dia mostrado na aba; escolhido em diaPadraoAgenda na 1ª vez
+
+  // renderizarAgendaGrade() — relê o estado do zero (sem cache) e
+  // re-renderiza chips + grid do dia selecionado inteiros.
+  function renderizarAgendaGrade() {
     var elConteudo = document.getElementById('agenda-conteudo');
     if (!elConteudo) return;
 
-    var estado = getState();
-    var listaAgenda = estado.agenda.map(getPalestraPorId).filter(Boolean);
-    listaAgenda.sort(compararDiaHorario);
-
-    if (listaAgenda.length === 0) {
-      elConteudo.innerHTML = '<p class="lista__vazio">Nada na agenda ainda. ' +
-        'Adicione a partir das Salvas ou da Programação.</p>';
+    var dias = diasUnicos(PALESTRAS); // todos os dias do EVENTO, não só os com itens na agenda
+    if (!dias.length) {
+      elConteudo.innerHTML = '<p class="lista__vazio">Nenhum dia de evento carregado.</p>';
       return;
     }
 
-    var todasSalvas = estado.salvas.map(getPalestraPorId).filter(Boolean);
-    var conflitos = acharConflitos(listaAgenda);
+    if (!agendaDiaSelecionado || dias.indexOf(agendaDiaSelecionado) === -1) {
+      agendaDiaSelecionado = diaPadraoAgenda(dias);
+    }
 
-    var html = '<p class="filtros__contagem">' + listaAgenda.length + ' na agenda</p>';
-    html += construirHtmlTimelineAgenda(listaAgenda, conflitos, todasSalvas, MATRIZ_DISTANCIAS);
+    var itensDoDia = itensAgendaPorDia(agendaDiaSelecionado);
+
+    var html = construirHtmlCabecalhoAgenda(dias, agendaDiaSelecionado, itensDoDia.length);
+    if (!itensDoDia.length) {
+      html += '<p class="lista__vazio">Nada na agenda nesse dia. Adicione a partir das Salvas ou da Programação.</p>';
+    } else {
+      html += construirHtmlGradeAgenda(itensDoDia);
+    }
 
     elConteudo.innerHTML = html;
   }
 
-  // delegação de eventos: um único listener no container da timeline
-  function aoClicarAgenda(evento) {
-    var botao = evento.target.closest('button[data-acao]');
-    if (!botao) return;
-    var id = Number(botao.getAttribute('data-id'));
-    var acao = botao.getAttribute('data-acao');
+  // -----------------------------------------------------------
+  // Modal de detalhes da Agenda — um único elemento reaproveitado
+  // (nunca um por card), criado sob demanda e anexado ao <body>.
+  // -----------------------------------------------------------
+  var modalAgendaEl = null;
+  var modalIdAtual = null; // id da palestra aberta no modal (pra reabrir depois de promover)
+  var elementoFocoAntesDoModal = null; // foco a devolver quando o modal fechar
 
-    if (acao === 'remover-agenda' || acao === 'promover') {
+  function garantirModalAgenda() {
+    if (modalAgendaEl) return modalAgendaEl;
+    var el = document.createElement('div');
+    el.id = 'agenda-modal';
+    el.className = 'modal';
+    el.hidden = true;
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-labelledby', 'agenda-modal-titulo');
+    el.innerHTML =
+      '<div class="modal__backdrop" data-acao-modal="fechar"></div>' +
+      '<div class="modal__painel">' +
+      '<button type="button" class="modal__fechar" data-acao-modal="fechar" aria-label="Fechar">✕</button>' +
+      '<div class="modal__corpo" id="agenda-modal-corpo"></div>' +
+      '</div>';
+    document.body.appendChild(el);
+    el.addEventListener('click', aoClicarModalAgenda);
+    document.addEventListener('keydown', aoTecladoModalAgenda);
+    modalAgendaEl = el;
+    return el;
+  }
+
+  // construirHtmlModalAgenda(p, ...) — TODOS os detalhes (o que hoje está
+  // no card da Agenda + no card da Programação): trilha, horário, título,
+  // local, palestrantes, tipo, conferência, descrição, aviso de caminhada
+  // (reusa construirHtmlTrecho), selo de conflito, remover da agenda e
+  // "outras salvas nesse horário" JÁ ABERTO (pedido explícito da Carla).
+  function construirHtmlModalAgenda(p, itensMesmoDia, todasSalvas, conflitos) {
+    var cor = corDaTrilha(p.trilha);
+    var local = p.predio || '';
+    if (p.palco) local += ' — ' + p.palco;
+
+    var html = '';
+    html += '<span class="card__badge-trilha" style="background:' + cor + '">' +
+      escaparHtml(normalizarTrilha(p.trilha)) + '</span>';
+    html += '<div class="card__horario">' + escaparHtml(p.inicio) + '–' + escaparHtml(p.fim) + '</div>';
+    html += '<h3 id="agenda-modal-titulo" class="modal__titulo">' + escaparHtml(p.titulo) + '</h3>';
+    html += '<div class="card__local">' + escaparHtml(local) + '</div>';
+
+    if (Array.isArray(p.palestrantes) && p.palestrantes.length) {
+      html += '<ul class="modal__palestrantes">';
+      p.palestrantes.forEach(function (pal) {
+        if (!pal || !pal.nome) return;
+        var texto = pal.nome + (pal.empresa ? ' — ' + pal.empresa : '');
+        html += '<li>' + escaparHtml(texto) + '</li>';
+      });
+      html += '</ul>';
+    }
+
+    var meta = [];
+    if (p.tipo) meta.push(escaparHtml(p.tipo));
+    if (p.conferencia) meta.push(escaparHtml(p.conferencia));
+    if (meta.length) html += '<div class="modal__meta">' + meta.join(' · ') + '</div>';
+
+    // a descrição vai pro FIM do modal (montada mais abaixo): no dia do
+    // evento o que importa primeiro é caminhada, conflito, ações e o
+    // plano B — descrição longa empurrava tudo isso pra fora da tela.
+    var anterior = acharAnteriorAgenda(p, itensMesmoDia);
+    if (anterior) {
+      html += construirHtmlTrecho(avaliarTrecho(anterior, p, MATRIZ_DISTANCIAS));
+    }
+
+    var conflitantes = (conflitos && conflitos[p.id]) || [];
+    if (conflitantes.length) {
+      html += '<div class="card__conflito card__conflito--grave">⚠ Conflito de horário com ' +
+        conflitantes.length +
+        (conflitantes.length === 1 ? ' outra palestra da agenda' : ' outras palestras da agenda') +
+        '</div>';
+    }
+
+    html += '<div class="modal__acoes">';
+    html += '<button type="button" class="botao botao--secundario" data-acao-modal="remover-agenda" data-id="' +
+      p.id + '">Remover da agenda</button>';
+    html += '<p class="agenda-item__nota">Continua nas salvas.</p>';
+    html += '</div>';
+
+    var candidatas = candidatasMesmoHorario(p, todasSalvas);
+    html += '<div class="modal__outras">';
+    html += '<h4 class="modal__outras-titulo">Outras salvas nesse horário</h4>';
+    if (candidatas.length) {
+      html += '<div class="agenda-item__outras-lista">';
+      candidatas.forEach(function (c) {
+        var localC = c.predio || '';
+        if (c.palco) localC += ' — ' + c.palco;
+        html += '<div class="agenda-item__outras-item">';
+        html += '<div class="agenda-item__outras-info">';
+        html += '<strong>' + escaparHtml(c.titulo) + '</strong>';
+        html += '<span>' + escaparHtml(c.inicio) + '–' + escaparHtml(c.fim) + ' · ' + escaparHtml(localC) + '</span>';
+        html += '</div>';
+        html += '<button type="button" class="botao botao--secundario" data-acao-modal="promover" data-id="' +
+          c.id + '">+ Agenda</button>';
+        html += '</div>';
+      });
+      html += '</div>';
+    } else {
+      html += '<p class="modal__outras-vazio">Nenhuma outra salva nesse horário.</p>';
+    }
+    html += '</div>';
+
+    if (p.descricao) {
+      html += '<p class="modal__descricao">' + escaparHtml(p.descricao) + '</p>';
+    }
+
+    return html;
+  }
+
+  // atualizarConteudoModalAgenda() — reconstrói o corpo do modal sem
+  // fechar/reabrir (usado depois de "promover", pra sumir a candidata
+  // da lista de "outras salvas" e refletir o novo estado).
+  function atualizarConteudoModalAgenda() {
+    if (modalIdAtual == null) return;
+    var p = getPalestraPorId(modalIdAtual);
+    if (!p) { fecharModalAgenda(); return; }
+
+    var estado = getState();
+    var todasSalvas = estado.salvas.map(getPalestraPorId).filter(Boolean);
+    var listaAgendaCompleta = estado.agenda.map(getPalestraPorId).filter(Boolean);
+    var conflitos = acharConflitos(listaAgendaCompleta);
+    var itensMesmoDia = itensAgendaPorDia(p.dia);
+
+    var corpo = document.getElementById('agenda-modal-corpo');
+    if (corpo) corpo.innerHTML = construirHtmlModalAgenda(p, itensMesmoDia, todasSalvas, conflitos);
+  }
+
+  function abrirModalAgenda(id) {
+    var p = getPalestraPorId(id);
+    if (!p) return;
+
+    var modal = garantirModalAgenda();
+    modalIdAtual = id;
+
+    var estado = getState();
+    var todasSalvas = estado.salvas.map(getPalestraPorId).filter(Boolean);
+    var listaAgendaCompleta = estado.agenda.map(getPalestraPorId).filter(Boolean);
+    var conflitos = acharConflitos(listaAgendaCompleta);
+    var itensMesmoDia = itensAgendaPorDia(p.dia);
+
+    var corpo = document.getElementById('agenda-modal-corpo');
+    corpo.innerHTML = construirHtmlModalAgenda(p, itensMesmoDia, todasSalvas, conflitos);
+
+    elementoFocoAntesDoModal = document.activeElement;
+    modal.hidden = false;
+    document.body.classList.add('modal-aberto'); // trava o scroll do body
+
+    var botaoFechar = modal.querySelector('.modal__fechar');
+    if (botaoFechar) botaoFechar.focus();
+  }
+
+  function fecharModalAgenda() {
+    var modal = document.getElementById('agenda-modal');
+    if (!modal || modal.hidden) return;
+    modal.hidden = true;
+    modalIdAtual = null;
+    document.body.classList.remove('modal-aberto');
+    if (elementoFocoAntesDoModal && typeof elementoFocoAntesDoModal.focus === 'function') {
+      elementoFocoAntesDoModal.focus();
+    }
+    elementoFocoAntesDoModal = null;
+  }
+
+  function aoClicarModalAgenda(evento) {
+    var alvo = evento.target.closest('[data-acao-modal]');
+    if (!alvo) return;
+    var acao = alvo.getAttribute('data-acao-modal');
+
+    if (acao === 'fechar') {
+      fecharModalAgenda();
+      return;
+    }
+
+    var id = Number(alvo.getAttribute('data-id'));
+    if (acao === 'remover-agenda') {
       toggleAgenda(id);
-      renderizarAgenda(); // membros da lista mudaram: refaz conflitos e trechos
+      fecharModalAgenda(); // remover fecha o modal (pedido do plano)
+      renderizarAgendaGrade();
+    } else if (acao === 'promover') {
+      toggleAgenda(id);
+      renderizarAgendaGrade(); // grid do fundo reflete a nova palestra agendada
+      atualizarConteudoModalAgenda(); // e some da lista de "outras salvas" aqui dentro
+    }
+  }
+
+  function aoTecladoModalAgenda(evento) {
+    if (evento.key !== 'Escape' && evento.key !== 'Esc') return;
+    var modal = document.getElementById('agenda-modal');
+    if (!modal || modal.hidden) return;
+    fecharModalAgenda();
+  }
+
+  // delegação de eventos: um único listener no container (chips de dia
+  // + abrir o modal ao clicar num card do grid).
+  function aoClicarAgendaGrade(evento) {
+    var chip = evento.target.closest('[data-dia-agenda]');
+    if (chip) {
+      var dia = chip.getAttribute('data-dia-agenda');
+      if (dia !== agendaDiaSelecionado) {
+        agendaDiaSelecionado = dia;
+        renderizarAgendaGrade();
+      }
+      return;
+    }
+
+    var card = evento.target.closest('.agenda-grade__card');
+    if (card) {
+      abrirModalAgenda(Number(card.getAttribute('data-id')));
     }
   }
 
@@ -1109,12 +1504,12 @@
     // listener de delegação ligado só uma vez no container (o container
     // em si nunca é substituído, só o innerHTML dele)
     if (!agendaInicializada) {
-      elConteudo.addEventListener('click', aoClicarAgenda);
+      elConteudo.addEventListener('click', aoClicarAgendaGrade);
       agendaInicializada = true;
     }
 
     // relê o estado do zero sempre que a aba abre — nada de cache
-    renderizarAgenda();
+    renderizarAgendaGrade();
   }
 
   // -----------------------------------------------------------
@@ -1314,6 +1709,8 @@
     avaliarTrecho: avaliarTrecho,
     getMatrizDistancias: function () {
       return MATRIZ_DISTANCIAS;
-    }
+    },
+    // Seção 4 (redesenho) — grid de horários estilo Google Calendar
+    posicionarNoGrid: posicionarNoGrid
   };
 })();

@@ -154,9 +154,19 @@ Próximos passos:
 4. (Bom ter) a partir de um horário, deixar claro quais salvas competem no mesmo slot.
 
 ## Seção 4 — Aba Agenda (executar no dia)
-**Status: ✅ Feita.** Timeline enxuta por dia, conflito em vermelho (mais grave que o âmbar das Salvas),
-aviso de distância ENTRE os cards, "Remover da agenda" (mantém salva) e
-o atalho `<details>` "Ver outras salvas nesse horário" com "+ Agenda" pra troca rápida.
+**Status: ✅ Feita — redesenhada em grid (2026-08-03, pedido da Carla).**
+Não é mais lista vertical: é um **grid de horários estilo Google Calendar**, **um dia por vez**
+(chips de dia no topo, sem "Todos"), 80px/hora, faixa de horas derivada dos itens daquele dia.
+Cards sobrepostos **empilham lateralmente** (`window.RIW.posicionarNoGrid(itens) → [{id, coluna, totalColunas}]`,
+clusters + colunas gulosas). O card resumido tem só **chip de caminhada + título**; o card é neutro com
+fundo na cor da trilha bem clara e filete lateral. **Cor do chip vem só do tempo de caminhada**
+(≤10 min âmbar, >10 min vermelho) — decisão da Carla, não olha a folga.
+Clicar no card abre um **modal** (bottom-sheet no mobile) com todo o resto: local, palestrantes,
+tipo/conferência, aviso de caminhada de 2 linhas, selo de conflito, "Remover da agenda" e
+**"Outras salvas nesse horário" já aberto**; a descrição fica no fim, pra não empurrar as ações
+pra fora da tela. Fecha no ✕, no backdrop e no Esc.
+O **card de intervalo entre cards saiu** (o grid já mostra o espaço) — `avaliarTrecho` e
+`construirHtmlTrecho` continuam, usados dentro do modal.
 `window.RIW.avaliarTrecho(ant, seg, matriz) → { custo, folga, nivel, mesmoPalco, de, para }`.
 
 **Card de intervalo (ajustado com a Carla em 2026-08-03) — duas linhas:**
