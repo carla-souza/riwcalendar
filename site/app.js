@@ -318,13 +318,46 @@
     return saida;
   }
 
-  var DIAS_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+  // -----------------------------------------------------------
+  // Ícones inline SVG — sem arquivo externo nenhum. Todos seguem o mesmo
+  // padrão: viewBox 24x24, stroke="currentColor" (herda a cor do texto do
+  // botão/chip pai — funciona sozinho em light/dark e nos estados
+  // ativo/inativo), stroke-width 2, linecap/linejoin "round".
+  // aria-hidden porque o texto ao lado do ícone já dá o rótulo acessível.
+  // -----------------------------------------------------------
+  function svgIcone(conteudoInterno, opts) {
+    opts = opts || {};
+    var tamanho = opts.tamanho || 18;
+    var fill = opts.fill || 'none';
+    return '<svg width="' + tamanho + '" height="' + tamanho + '" viewBox="0 0 24 24" fill="' + fill +
+      '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
+      'aria-hidden="true">' + conteudoInterno + '</svg>';
+  }
 
-  // "2026-08-04" → "Terça, 04/08" (Date local, sem risco de fuso mudar o dia)
-  function formatarCabecalhoDia(diaIso) {
-    var partes = diaIso.split('-');
-    var d = new Date(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2]));
-    return DIAS_SEMANA[d.getDay()] + ', ' + partes[2] + '/' + partes[1];
+  // bookmark (marcador de página) — "Tenho interesse". Preenchido quando
+  // ativo/marcado, só contorno quando não.
+  function iconeBookmark(ativo, tamanho) {
+    var path = '<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>';
+    return svgIcone(path, { tamanho: tamanho, fill: ativo ? 'currentColor' : 'none' });
+  }
+
+  // base do calendário (retângulo + argolas + linha do cabeçalho), reusada
+  // pelas 3 variantes abaixo (com "+", com "−", ou lisa pra tab bar).
+  function iconeCalendarioBase(conteudoExtra, tamanho) {
+    var base = '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>' +
+      '<line x1="16" y1="2" x2="16" y2="6"/>' +
+      '<line x1="8" y1="2" x2="8" y2="6"/>' +
+      '<line x1="3" y1="10" x2="21" y2="10"/>';
+    return svgIcone(base + (conteudoExtra || ''), { tamanho: tamanho });
+  }
+
+  function iconeCalendarioMais(tamanho) {
+    return iconeCalendarioBase(
+      '<line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/>', tamanho);
+  }
+
+  function iconeCalendarioMenos(tamanho) {
+    return iconeCalendarioBase('<line x1="10" y1="16" x2="14" y2="16"/>', tamanho);
   }
 
   // -----------------------------------------------------------
@@ -333,10 +366,16 @@
   var TAMANHO_PAGINA = 80;
   var programacaoInicializada = false;
   var qtdVisivel = TAMANHO_PAGINA;
+  // diaFiltroPadrao é setado em renderProgramacao() na 1ª vez que a
+  // Programação renderiza (quando PALESTRAS já carregou), usando
+  // diaPadraoAgenda() — a mesma função que a Agenda já usa. Guardado à
+  // parte pra filtrosEstaoAtivos()/limparFiltros() saberem qual é o "sem
+  // filtro nenhum" agora que não existe mais o chip "Todas".
+  var diaFiltroPadrao = null;
   var filtroEstado = { dia: 'todos', trilha: 'todas', predio: 'todos', tipo: 'todos', busca: '', interesse: false };
 
   function filtrosEstaoAtivos() {
-    return filtroEstado.dia !== 'todos' ||
+    return filtroEstado.dia !== diaFiltroPadrao ||
       filtroEstado.trilha !== 'todas' ||
       filtroEstado.predio !== 'todos' ||
       filtroEstado.tipo !== 'todos' ||
@@ -344,30 +383,29 @@
       filtroEstado.interesse === true;
   }
 
-  function construirHtmlFiltros() {
+  // chips de dia vivem fora do card de filtros agora (logo abaixo do
+  // título da página) — HTML deles é construído à parte por
+  // construirHtmlDiasProgramacao() e injetado em #programacao-dias.
+  function construirHtmlDiasProgramacao() {
     var dias = diasUnicos(PALESTRAS);
+    var html = '';
+    // sem chip "Todas": o dia ativo (filtroEstado.dia) já foi setado pra
+    // diaPadraoAgenda() em renderProgramacao(), antes desta função rodar.
+    dias.forEach(function (d) {
+      var partes = d.split('-');
+      var ativo = d === filtroEstado.dia;
+      html += '<button type="button" class="chip' + (ativo ? ' chip--ativo' : '') + '" data-dia="' + d +
+        '" aria-pressed="' + ativo + '">' + partes[2] + '/' + partes[1] + '</button>';
+    });
+    return html;
+  }
+
+  function construirHtmlFiltros() {
     var trilhas = valoresUnicosOrdenados(PALESTRAS, function (p) { return normalizarTrilha(p.trilha); });
     var predios = valoresUnicosOrdenados(PALESTRAS, function (p) { return p.predio_base; });
     var tipos = valoresUnicosOrdenados(PALESTRAS, function (p) { return p.tipo; });
 
     var html = '';
-    html += '<p class="filtros__contagem" id="filtro-contagem"></p>';
-
-    html += '<div class="filtros__dias" role="group" aria-label="Filtrar por dia">';
-    html += '<button type="button" class="chip chip--ativo" data-dia="todos" aria-pressed="true">Todos</button>';
-    dias.forEach(function (d) {
-      var partes = d.split('-');
-      html += '<button type="button" class="chip" data-dia="' + d + '" aria-pressed="false">' +
-        partes[2] + '/' + partes[1] + '</button>';
-    });
-    html += '</div>';
-
-    // chip toggle "Tenho interesse" — filtra às palestras marcadas via
-    // toggleSalva/isSalva; compõe com os outros filtros (não substitui).
-    html += '<div class="filtros__interesse-linha">';
-    html += '<button type="button" class="chip chip--interesse" id="filtro-interesse" ' +
-      'aria-pressed="false">Tenho interesse</button>';
-    html += '</div>';
 
     function opcoesSelect(valores) {
       return valores.map(function (v) {
@@ -377,6 +415,15 @@
     }
 
     html += '<div class="filtros__linha">';
+    // "Minha marcação" — toggle "Tenho interesse", primeiro campo de todos,
+    // na mesma lógica de espaçamento dos selects (.filtros__label dentro de
+    // .filtros__linha), mas com largura própria de 100% (.filtros__label--
+    // interesse) pra sempre ocupar uma linha sozinho, mesmo no mobile. É um
+    // FILTRO que liga/desliga (compõe com os outros filtros, não
+    // substitui). Filtra às palestras marcadas via toggleSalva/isSalva.
+    html += '<label class="filtros__label filtros__label--interesse" for="filtro-interesse">Minha marcação' +
+      '<button type="button" class="filtros__campo-toggle" id="filtro-interesse" aria-pressed="false">' +
+      '<span class="botao__icone">' + iconeBookmark(false, 18) + '</span><span>Tenho interesse</span></button></label>';
     html += '<label class="filtros__label" for="filtro-trilha">Trilha' +
       '<select id="filtro-trilha" class="filtros__select"><option value="todas">Todas</option>' +
       opcoesSelect(trilhas) + '</select></label>';
@@ -403,8 +450,11 @@
     if (botao) botao.hidden = !filtrosEstaoAtivos();
   }
 
+  // gerencia só os chips de DIA (seleção single-choice); o chip "Tenho
+  // interesse" vive fora de .filtros__dias agora (handler próprio em
+  // ligarEventosFiltros) e nem entra nessa varredura.
   function marcarChipAtivo(container, chipClicado) {
-    var chips = container.querySelectorAll('.chip');
+    var chips = container.querySelectorAll('.filtros__dias .chip');
     chips.forEach(function (chip) {
       var ativo = chip === chipClicado;
       chip.classList.toggle('chip--ativo', ativo);
@@ -419,10 +469,10 @@
   }
 
   function limparFiltros(container) {
-    filtroEstado = { dia: 'todos', trilha: 'todas', predio: 'todos', tipo: 'todos', busca: '', interesse: false };
+    filtroEstado = { dia: diaFiltroPadrao, trilha: 'todas', predio: 'todos', tipo: 'todos', busca: '', interesse: false };
 
-    var chipTodos = container.querySelector('.chip[data-dia="todos"]');
-    if (chipTodos) marcarChipAtivo(container, chipTodos);
+    var chipDiaPadrao = container.querySelector('.chip[data-dia="' + diaFiltroPadrao + '"]');
+    if (chipDiaPadrao) marcarChipAtivo(container, chipDiaPadrao);
 
     var selTrilha = container.querySelector('#filtro-trilha');
     var selPredio = container.querySelector('#filtro-predio');
@@ -435,7 +485,7 @@
 
     var elInteresse = container.querySelector('#filtro-interesse');
     if (elInteresse) {
-      elInteresse.classList.remove('chip--ativo');
+      elInteresse.classList.remove('filtros__campo-toggle--ativo');
       elInteresse.setAttribute('aria-pressed', 'false');
     }
 
@@ -486,7 +536,7 @@
     if (elInteresse) {
       elInteresse.addEventListener('click', function () {
         filtroEstado.interesse = !filtroEstado.interesse;
-        elInteresse.classList.toggle('chip--ativo', filtroEstado.interesse);
+        elInteresse.classList.toggle('filtros__campo-toggle--ativo', filtroEstado.interesse);
         elInteresse.setAttribute('aria-pressed', String(filtroEstado.interesse));
         aoMudarFiltro(container);
       });
@@ -519,31 +569,28 @@
     if (nomes) {
       html += '<div class="card__palestrantes">' + escaparHtml(nomes) + '</div>';
     }
+    if (p.descricao) {
+      html += '<p class="card__descricao">' + escaparHtml(p.descricao) + '</p>';
+    }
     html += '<div class="card__acoes">';
     html += '<button type="button" class="botao ' + (salva ? 'botao--ativo' : 'botao--secundario') +
       '" data-acao="salvar" data-id="' + p.id + '" aria-pressed="' + salva + '">' +
-      (salva ? '✓ Tenho interesse' : 'Tenho interesse') + '</button>';
+      '<span class="botao__icone">' + iconeBookmark(salva, 18) + '</span><span>Tenho interesse</span></button>';
     html += '<button type="button" class="botao ' + (agendada ? 'botao--ativo' : 'botao--secundario') +
       '" data-acao="agenda" data-id="' + p.id + '" aria-pressed="' + agendada + '">' +
-      (agendada ? '✓ Na agenda' : '+ Agenda') + '</button>';
+      '<span class="botao__icone">' + iconeCalendarioMais(18) + '</span><span>' +
+      (agendada ? 'Na agenda' : 'Adicionar na agenda') + '</span></button>';
     html += '</div>';
     html += '</article>';
     return html;
   }
 
-  // agrupa por dia (a lista já vem ordenada por dia/inicio)
+  // a lista sempre mostra um único dia por vez agora (o filtro de dia da
+  // Programação não produz mais 'todos' via UI), então não agrupa mais por
+  // cabeçalho de dia — só concatena os cards. O cabeçalho "Exibindo N
+  // palestras" fica por conta de renderizarListaResultados().
   function construirHtmlLista(itens) {
-    var partes = [];
-    var diaAtual = null;
-    for (var i = 0; i < itens.length; i++) {
-      var p = itens[i];
-      if (p.dia !== diaAtual) {
-        diaAtual = p.dia;
-        partes.push('<h3 class="lista__cabecalho-dia">' + escaparHtml(formatarCabecalhoDia(p.dia)) + '</h3>');
-      }
-      partes.push(construirHtmlCard(p));
-    }
-    return partes.join('');
+    return itens.map(construirHtmlCard).join('');
   }
 
   // atualiza só os botões de UM card, sem re-renderizar a lista inteira
@@ -557,13 +604,15 @@
     if (btnSalvar) {
       btnSalvar.className = 'botao ' + (salva ? 'botao--ativo' : 'botao--secundario');
       btnSalvar.setAttribute('aria-pressed', String(salva));
-      btnSalvar.textContent = salva ? '✓ Tenho interesse' : 'Tenho interesse';
+      btnSalvar.innerHTML = '<span class="botao__icone">' + iconeBookmark(salva, 18) +
+        '</span><span>Tenho interesse</span>';
     }
     var btnAgenda = card.querySelector('[data-acao="agenda"]');
     if (btnAgenda) {
       btnAgenda.className = 'botao ' + (agendada ? 'botao--ativo' : 'botao--secundario');
       btnAgenda.setAttribute('aria-pressed', String(agendada));
-      btnAgenda.textContent = agendada ? '✓ Na agenda' : '+ Agenda';
+      btnAgenda.innerHTML = '<span class="botao__icone">' + iconeCalendarioMais(18) + '</span><span>' +
+        (agendada ? 'Na agenda' : 'Adicionar na agenda') + '</span>';
     }
   }
 
@@ -587,7 +636,6 @@
 
   function renderizarListaResultados() {
     var elLista = document.getElementById('programacao-conteudo');
-    var elContagem = document.getElementById('filtro-contagem');
     if (!elLista) return;
 
     var idsInteresse = getState().salvas;
@@ -602,10 +650,6 @@
     };
     var resultado = filtrarPalestras(PALESTRAS, filtros);
 
-    if (elContagem) {
-      elContagem.textContent = resultado.length + (resultado.length === 1 ? ' palestra' : ' palestras');
-    }
-
     if (resultado.length === 0) {
       if (filtroEstado.interesse && idsInteresse.length === 0) {
         elLista.innerHTML = '<p class="lista__vazio">Você ainda não marcou nenhuma palestra como ' +
@@ -617,7 +661,13 @@
     }
 
     var visiveis = resultado.slice(0, qtdVisivel);
-    var html = construirHtmlLista(visiveis);
+    // cabeçalho "Exibindo N palestras" no topo dos resultados — fonte
+    // única da contagem agora que o filtro de dia é sempre um dia só
+    // (o antigo filtros__contagem no topo da caixa de filtros duplicava
+    // essa informação e foi removido).
+    var html = '<h3 class="lista__cabecalho-dia">Exibindo ' + resultado.length +
+      (resultado.length === 1 ? ' palestra' : ' palestras') + '</h3>';
+    html += construirHtmlLista(visiveis);
 
     if (resultado.length > visiveis.length) {
       html += '<button type="button" id="botao-carregar-mais" class="botao botao--secundario botao--carregar-mais">' +
@@ -1069,22 +1119,17 @@
     return html;
   }
 
-  // cabeçalho da Agenda: chips de dia (sem "Todos" — a Agenda mostra um
-  // dia por vez) + cabeçalho do dia + contagem.
-  function construirHtmlCabecalhoAgenda(dias, diaSelecionado, qtdNoDia) {
-    var html = '<div class="filtros">';
-    html += '<div class="filtros__dias" role="group" aria-label="Selecionar dia da agenda">';
+  // chips de dia da Agenda (sem "Todos" — a Agenda mostra um dia por vez)
+  // vivem fora do card de conteúdo agora, em #agenda-dias, logo abaixo do
+  // título da página (mesmo tratamento da Programação).
+  function construirHtmlDiasAgenda(dias, diaSelecionado) {
+    var html = '';
     dias.forEach(function (d) {
       var partes = d.split('-');
       var ativo = d === diaSelecionado;
       html += '<button type="button" class="chip' + (ativo ? ' chip--ativo' : '') + '" ' +
         'data-dia-agenda="' + d + '" aria-pressed="' + ativo + '">' + partes[2] + '/' + partes[1] + '</button>';
     });
-    html += '</div>';
-    html += '<h3 class="lista__cabecalho-dia agenda-grade__cabecalho-dia">' +
-      escaparHtml(formatarCabecalhoDia(diaSelecionado)) + '</h3>';
-    html += '<p class="filtros__contagem">' + qtdNoDia + ' na agenda nesse dia</p>';
-    html += '</div>';
     return html;
   }
 
@@ -1093,11 +1138,13 @@
   // renderizarAgendaGrade() — relê o estado do zero (sem cache) e
   // re-renderiza chips + grid do dia selecionado inteiros.
   function renderizarAgendaGrade() {
+    var elDias = document.getElementById('agenda-dias');
     var elConteudo = document.getElementById('agenda-conteudo');
-    if (!elConteudo) return;
+    if (!elDias || !elConteudo) return;
 
     var dias = diasUnicos(PALESTRAS); // todos os dias do EVENTO, não só os com itens na agenda
     if (!dias.length) {
+      elDias.innerHTML = '';
       elConteudo.innerHTML = '<p class="lista__vazio">Nenhum dia de evento carregado.</p>';
       return;
     }
@@ -1108,7 +1155,10 @@
 
     var itensDoDia = itensAgendaPorDia(agendaDiaSelecionado);
 
-    var html = construirHtmlCabecalhoAgenda(dias, agendaDiaSelecionado, itensDoDia.length);
+    elDias.innerHTML = construirHtmlDiasAgenda(dias, agendaDiaSelecionado);
+
+    var html = '<h3 class="lista__cabecalho-dia">Exibindo ' + itensDoDia.length +
+      (itensDoDia.length === 1 ? ' palestra' : ' palestras') + '</h3>';
     if (!itensDoDia.length) {
       html += '<p class="lista__vazio">Nada na agenda nesse dia. Adicione a partir da Programação.</p>';
     } else {
@@ -1191,7 +1241,8 @@
     // sem selo de conflito: a sobreposição já se vê no grid (pedido da Carla)
     html += '<div class="modal__acoes">';
     html += '<button type="button" class="botao botao--secundario" data-acao-modal="remover-agenda" data-id="' +
-      p.id + '">Remover da agenda</button>';
+      p.id + '"><span class="botao__icone">' + iconeCalendarioMenos(18) +
+      '</span><span>Remover da agenda</span></button>';
     html += '</div>';
 
     var candidatas = candidatasMesmoHorario(p, todasSalvas);
@@ -1327,9 +1378,11 @@
   var ABA_PADRAO = 'programacao';
 
   function renderProgramacao() {
+    var elSecao = document.getElementById('programacao');
+    var elDias = document.getElementById('programacao-dias');
     var elFiltros = document.getElementById('programacao-filtros');
     var elLista = document.getElementById('programacao-conteudo');
-    if (!elFiltros || !elLista) return;
+    if (!elSecao || !elDias || !elFiltros || !elLista) return;
 
     if (!DADOS_CARREGADOS) {
       elLista.innerHTML = '<p class="carregando">Carregando palestras…</p>';
@@ -1339,8 +1392,17 @@
     // barra de filtros é construída e ligada só uma vez; cliques/troca de
     // filtro depois disso só re-renderizam a lista de resultados.
     if (!programacaoInicializada) {
+      // dia padrão = hoje (se for um dos dias do evento) senão o primeiro
+      // dia — mesma lógica já testada na Agenda (diaPadraoAgenda). Precisa
+      // rodar aqui (não na declaração de filtroEstado lá em cima) porque
+      // só agora PALESTRAS já carregou.
+      diaFiltroPadrao = diaPadraoAgenda(diasUnicos(PALESTRAS));
+      filtroEstado.dia = diaFiltroPadrao;
+      elDias.innerHTML = construirHtmlDiasProgramacao();
       elFiltros.innerHTML = construirHtmlFiltros();
-      ligarEventosFiltros(elFiltros);
+      // container abrange os pills de dia (fora do card) e o resto dos
+      // filtros (dentro do card) — os dois são descendentes de #programacao.
+      ligarEventosFiltros(elSecao);
       elLista.addEventListener('click', aoClicarLista);
       programacaoInicializada = true;
     }
@@ -1349,18 +1411,21 @@
   }
 
   function renderAgenda() {
+    var elSecao = document.getElementById('agenda');
     var elConteudo = document.getElementById('agenda-conteudo');
-    if (!elConteudo) return;
+    if (!elSecao || !elConteudo) return;
 
     if (!DADOS_CARREGADOS) {
       elConteudo.innerHTML = '<p class="carregando">Carregando palestras…</p>';
       return;
     }
 
-    // listener de delegação ligado só uma vez no container (o container
-    // em si nunca é substituído, só o innerHTML dele)
+    // listener de delegação ligado só uma vez na seção inteira (cobre os
+    // pills de dia em #agenda-dias, fora do card, e o grid dentro de
+    // #agenda-conteudo — os elementos em si são recriados a cada render,
+    // mas a seção nunca é substituída).
     if (!agendaInicializada) {
-      elConteudo.addEventListener('click', aoClicarAgendaGrade);
+      elSecao.addEventListener('click', aoClicarAgendaGrade);
       agendaInicializada = true;
     }
 
@@ -1422,9 +1487,6 @@
 
   function construirHtmlMapa() {
     var html = '';
-    html += '<p class="mapa__lembrete">🚶 A matriz de tempo de caminhada (usada na aba Agenda) já ' +
-      'considera lotação e buffer de saída de palco.</p>';
-
     html += '<div class="mapa__controles" role="group" aria-label="Zoom do mapa">';
     html += '<button type="button" class="botao botao--secundario" data-zoom="menos" aria-label="Diminuir zoom">−</button>';
     html += '<span id="mapa-zoom-rotulo" class="mapa__zoom-rotulo">100%</span>';

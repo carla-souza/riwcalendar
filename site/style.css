@@ -117,6 +117,10 @@ body {
   color: var(--texto-secundario);
 }
 
+.cabecalho__subtitulo a {
+  color: var(--cor-acao);
+}
+
 /* ---------- navegação de abas (fixa embaixo, estilo tab bar) ---------- */
 .abas {
   position: fixed;
@@ -133,7 +137,7 @@ body {
 .abas__botao {
   flex: 1 1 0;
   min-height: 44px;
-  padding: 10px 4px;
+  padding: 8px 4px 10px;
   border: none;
   background: transparent;
   color: var(--texto-secundario);
@@ -142,6 +146,14 @@ body {
   font-weight: 600;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  /* ícone em cima, label embaixo — padrão de tab bar estilo iOS. Os SVGs
+     usam stroke="currentColor", então herdam a cor daqui de graça,
+     inclusive no estado ativo (aria-current abaixo). */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
 }
 
 .abas__botao:active {
@@ -207,7 +219,8 @@ body {
   margin-bottom: 6px;
 }
 
-.card__horario {
+.card__horario,
+.card__local {
   font-size: 12px;
   font-weight: 600;
   color: var(--texto-secundario);
@@ -222,11 +235,6 @@ body {
   overflow-wrap: anywhere;
 }
 
-.card__local {
-  font-size: 13px;
-  color: var(--texto-secundario);
-}
-
 .card__acoes {
   display: flex;
   flex-wrap: wrap;
@@ -234,18 +242,22 @@ body {
   margin-top: 8px;
 }
 
-/* "Tenho interesse" é mais comprido que "Salvar" — os dois botões
-   encolhem (flex-basis pequeno) e, se ainda assim não couberem lado a
-   lado num celular estreito (320px), o flex-wrap empilha um por linha
-   em vez de cortar o texto. */
+/* botões do card ocupam só a largura do próprio conteúdo (ícone + label),
+   não a largura toda do card; o flex-wrap do .card__acoes garante que
+   ainda assim empilham um por linha se não couberem lado a lado. */
 .card__acoes .botao {
-  flex: 1 1 120px;
+  flex: 0 0 auto;
   min-width: 0;
   padding: 0 10px;
   font-size: 13px;
   line-height: 1.2;
   text-align: center;
   white-space: normal;
+  /* ícone + texto lado a lado, os dois centralizados no botão */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .botao {
@@ -296,13 +308,6 @@ body {
   margin-bottom: 12px;
 }
 
-.filtros__contagem {
-  margin: 0 0 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--texto-secundario);
-}
-
 .filtros__dias {
   display: flex;
   flex-wrap: wrap;
@@ -322,6 +327,10 @@ body {
   font-weight: 600;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .chip--ativo {
@@ -330,15 +339,11 @@ body {
   color: var(--texto-sobre-acao);
 }
 
-/* chip toggle "Tenho interesse" — mesmo padrão visual dos chips de dia
-   (liga/desliga via .chip--ativo), só numa linha própria pra não
-   competir com os chips de dia (que podem ser vários). */
-.filtros__interesse-linha {
-  margin-bottom: 10px;
-}
-
-.chip--interesse {
-  display: inline-block;
+/* ícone dentro de botão/chip (bookmark, calendário-com-mais/menos) —
+   alinhamento vertical com o texto ao lado. */
+.botao__icone {
+  display: inline-flex;
+  align-items: center;
 }
 
 .filtros__linha {
@@ -363,8 +368,15 @@ body {
   color: var(--texto-terciario);
 }
 
+/* sempre sozinho na própria linha (mesmo no mobile), pra não competir
+   por espaço com Trilha/Prédio/Tipo e empurrá-los pra baixo. */
+.filtros__label--interesse {
+  flex-basis: 100%;
+}
+
 .filtros__select,
-.filtros__busca {
+.filtros__busca,
+.filtros__campo-toggle {
   min-height: 40px;
   min-width: 0;
   width: 100%;
@@ -384,6 +396,37 @@ body {
 .filtros__busca:focus {
   outline: 2px solid var(--cor-acao);
   outline-offset: 1px;
+}
+
+/* "Minha marcação" — mesmo campo visual dos selects, mas é um botão:
+   liga/desliga o filtro "Tenho interesse" (compõe com os outros filtros,
+   não substitui). Tinted quando ativo em vez de um preenchimento sólido,
+   pra não parecer seleção de valor única como os selects ao lado. */
+.filtros__campo-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.filtros__campo-toggle--ativo {
+  background: var(--cor-acao-tint);
+  border-color: var(--cor-acao);
+  color: var(--cor-acao);
+}
+
+/* o bookmark nasce com fill="none" (outline); a CSS sobrescreve esse
+   presentation attribute pra "currentColor" quando o campo fica ativo —
+   bookmark preenchido = "marcado". Presentation attribute sempre perde
+   pra qualquer regra CSS, então isso funciona mesmo sem re-renderizar
+   o SVG no clique. */
+.filtros__campo-toggle .botao__icone svg {
+  fill: none;
+}
+
+.filtros__campo-toggle--ativo .botao__icone svg {
+  fill: currentColor;
 }
 
 .filtros__busca-linha {
@@ -435,6 +478,18 @@ body {
   font-size: 13px;
   color: var(--texto-secundario);
   margin-top: 2px;
+}
+
+/* recortada em 3 linhas pra não estourar a altura do card numa lista densa */
+.card__descricao {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--texto-secundario);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 /* ---------- aba Agenda (Seção 4) — trechos e selo de conflito (usados dentro do modal) ---------- */
@@ -527,16 +582,6 @@ body {
 }
 
 /* ---------- aba Mapa (Seção 4B) — planta oficial com zoom/pan ---------- */
-.mapa__lembrete {
-  background: var(--superficie-card);
-  border-radius: var(--raio);
-  box-shadow: var(--sombra-card);
-  padding: 12px;
-  margin: 0 0 12px;
-  font-size: 13px;
-  color: var(--texto-secundario);
-}
-
 .mapa__controles {
   display: flex;
   align-items: center;
@@ -603,12 +648,8 @@ body {
 }
 
 /* ---------- aba Agenda (redesenho) — grid de horários + modal de detalhes ---------- */
-/* cabeçalho: chips de dia + cabeçalho do dia + contagem reaproveitam
-   .filtros/.filtros__dias/.chip (mesmo visual da Programação) — só o
-   espaçamento extra do h3 abaixo dos chips precisa de ajuste aqui. */
-.agenda-grade__cabecalho-dia {
-  margin-top: 12px;
-}
+/* cabeçalho: chips de dia reaproveitam .filtros__dias/.chip (mesmo visual
+   da Programação), fora do card de conteúdo — ver #agenda-dias no HTML. */
 
 /* grid: coluna de horas fixa à esquerda + área de eventos rolável por
    dentro (a PÁGINA nunca rola de lado, só esta área). */
@@ -819,6 +860,14 @@ body {
 
 .modal__acoes {
   margin: 12px 0;
+}
+
+.modal__acoes .botao {
+  /* ícone (calendário-com-menos) + texto lado a lado, centralizados */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .modal__outras {
