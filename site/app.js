@@ -851,15 +851,21 @@
 
     var folga = minutosDoHorario(seguinte.inicio) - minutosDoHorario(anterior.fim);
 
+    // chegada real = fim da anterior + caminhada. "Não vai chegar a tempo"
+    // vale só quando essa chegada cai depois do FIM da seguinte (pedido da
+    // Carla) — atraso que ainda pega parte da palestra continua sendo atraso.
+    var perdeuTudo = custo != null &&
+      minutosDoHorario(anterior.fim) + custo >= minutosDoHorario(seguinte.fim);
+
     var nivel;
     if (mesmoPalco) {
       nivel = 'ok'; // mesmo palco: fica no lugar, sem aviso — nunca é risco
     } else if (custo == null) {
       nivel = 'ok'; // sem dado de distância — não alarma
-    } else if (folga < 0) {
-      nivel = 'impossivel'; // sobreposição real de horário
+    } else if (perdeuTudo) {
+      nivel = 'impossivel'; // chega depois de acabar
     } else if (folga < custo) {
-      nivel = 'atrasado'; // não sobrepõe, mas o deslocamento causa atraso
+      nivel = 'atrasado'; // chega atrasado, mas ainda pega parte
     } else if (folga - custo < 10) {
       nivel = 'apertado';
     } else {
@@ -912,10 +918,11 @@
     }
 
     var linha2;
+    var atraso = (avaliacao.custo == null) ? null : avaliacao.custo - avaliacao.folga;
     if (avaliacao.nivel === 'impossivel') {
       linha2 = '⏰ Você não vai chegar a tempo';
-    } else if (avaliacao.nivel === 'atrasado') {
-      linha2 = '⏰ Você vai chegar com ' + (avaliacao.custo - avaliacao.folga) + ' min de atraso';
+    } else if (atraso != null && atraso > 0) {
+      linha2 = '⏰ Você vai chegar com ' + atraso + ' min de atraso';
     } else if (avaliacao.custo == null && avaliacao.folga < 0) {
       // custo desconhecido e a folga já é negativa: não dá pra afirmar
       // intervalo (folga negativa) nem calcular atraso (custo
@@ -1257,12 +1264,11 @@
     return el;
   }
 
-  // construirHtmlModalAgenda(p, ...) — TODOS os detalhes (o que hoje está
-  // no card da Agenda + no card da Programação): trilha, horário, título,
-  // local, palestrantes, tipo, conferência, descrição, aviso de caminhada
-  // (reusa construirHtmlTrecho), selo de conflito, remover da agenda e
-  // "outras salvas nesse horário" JÁ ABERTO (pedido explícito da Carla).
-  function construirHtmlModalAgenda(p, itensMesmoDia, todasSalvas, conflitos) {
+  // construirHtmlModalAgenda(p, ...) — TODOS os detalhes, na ordem que a
+  // Carla pediu: trilha, conferência, título, "horário · local", descrição,
+  // palestrantes, aviso de caminhada (reusa construirHtmlTrecho), remover da
+  // agenda e "outras salvas nesse horário" JÁ ABERTO (pedido explícito dela).
+  function construirHtmlModalAgenda(p, itensMesmoDia, todasSalvas) {
     var cor = corDaTrilha(p.trilha);
     var local = p.predio || '';
     if (p.palco) local += ' — ' + p.palco;
@@ -1270,9 +1276,18 @@
     var html = '';
     html += '<span class="card__badge-trilha" style="background:' + cor + '">' +
       escaparHtml(normalizarTrilha(p.trilha)) + '</span>';
-    html += '<div class="card__horario">' + escaparHtml(p.inicio) + '–' + escaparHtml(p.fim) + '</div>';
+    // ordem pedida pela Carla: conferência no topo, horário colado no local,
+    // descrição antes dos palestrantes. O tipo ("Painel") saiu — não ajuda.
+    if (p.conferencia) {
+      html += '<div class="modal__meta">' + escaparHtml(p.conferencia) + '</div>';
+    }
     html += '<h3 id="agenda-modal-titulo" class="modal__titulo">' + escaparHtml(p.titulo) + '</h3>';
-    html += '<div class="card__local">' + escaparHtml(local) + '</div>';
+    html += '<div class="card__local">' + escaparHtml(p.inicio) + '–' + escaparHtml(p.fim) +
+      (local ? ' · ' + escaparHtml(local) : '') + '</div>';
+
+    if (p.descricao) {
+      html += '<p class="modal__descricao">' + escaparHtml(p.descricao) + '</p>';
+    }
 
     if (Array.isArray(p.palestrantes) && p.palestrantes.length) {
       html += '<ul class="modal__palestrantes">';
@@ -1284,31 +1299,15 @@
       html += '</ul>';
     }
 
-    var meta = [];
-    if (p.tipo) meta.push(escaparHtml(p.tipo));
-    if (p.conferencia) meta.push(escaparHtml(p.conferencia));
-    if (meta.length) html += '<div class="modal__meta">' + meta.join(' · ') + '</div>';
-
-    // a descrição vai pro FIM do modal (montada mais abaixo): no dia do
-    // evento o que importa primeiro é caminhada, conflito, ações e o
-    // plano B — descrição longa empurrava tudo isso pra fora da tela.
     var anterior = acharAnteriorAgenda(p, itensMesmoDia);
     if (anterior) {
       html += construirHtmlTrecho(avaliarTrecho(anterior, p, MATRIZ_DISTANCIAS));
     }
 
-    var conflitantes = (conflitos && conflitos[p.id]) || [];
-    if (conflitantes.length) {
-      html += '<div class="card__conflito card__conflito--grave">⚠ Conflito de horário com ' +
-        conflitantes.length +
-        (conflitantes.length === 1 ? ' outra palestra da agenda' : ' outras palestras da agenda') +
-        '</div>';
-    }
-
+    // sem selo de conflito: a sobreposição já se vê no grid (pedido da Carla)
     html += '<div class="modal__acoes">';
     html += '<button type="button" class="botao botao--secundario" data-acao-modal="remover-agenda" data-id="' +
       p.id + '">Remover da agenda</button>';
-    html += '<p class="agenda-item__nota">Continua nas salvas.</p>';
     html += '</div>';
 
     var candidatas = candidatasMesmoHorario(p, todasSalvas);
@@ -1334,10 +1333,6 @@
     }
     html += '</div>';
 
-    if (p.descricao) {
-      html += '<p class="modal__descricao">' + escaparHtml(p.descricao) + '</p>';
-    }
-
     return html;
   }
 
@@ -1351,12 +1346,10 @@
 
     var estado = getState();
     var todasSalvas = estado.salvas.map(getPalestraPorId).filter(Boolean);
-    var listaAgendaCompleta = estado.agenda.map(getPalestraPorId).filter(Boolean);
-    var conflitos = acharConflitos(listaAgendaCompleta);
     var itensMesmoDia = itensAgendaPorDia(p.dia);
 
     var corpo = document.getElementById('agenda-modal-corpo');
-    if (corpo) corpo.innerHTML = construirHtmlModalAgenda(p, itensMesmoDia, todasSalvas, conflitos);
+    if (corpo) corpo.innerHTML = construirHtmlModalAgenda(p, itensMesmoDia, todasSalvas);
   }
 
   function abrirModalAgenda(id) {
@@ -1368,12 +1361,10 @@
 
     var estado = getState();
     var todasSalvas = estado.salvas.map(getPalestraPorId).filter(Boolean);
-    var listaAgendaCompleta = estado.agenda.map(getPalestraPorId).filter(Boolean);
-    var conflitos = acharConflitos(listaAgendaCompleta);
     var itensMesmoDia = itensAgendaPorDia(p.dia);
 
     var corpo = document.getElementById('agenda-modal-corpo');
-    corpo.innerHTML = construirHtmlModalAgenda(p, itensMesmoDia, todasSalvas, conflitos);
+    corpo.innerHTML = construirHtmlModalAgenda(p, itensMesmoDia, todasSalvas);
 
     elementoFocoAntesDoModal = document.activeElement;
     modal.hidden = false;

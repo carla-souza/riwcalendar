@@ -161,10 +161,11 @@ Cards sobrepostos **empilham lateralmente** (`window.RIW.posicionarNoGrid(itens)
 clusters + colunas gulosas). O card resumido tem só **chip de caminhada + título**; o card é neutro com
 fundo na cor da trilha bem clara e filete lateral. **Cor do chip vem só do tempo de caminhada**
 (≤10 min âmbar, >10 min vermelho) — decisão da Carla, não olha a folga.
-Clicar no card abre um **modal** (bottom-sheet no mobile) com todo o resto: local, palestrantes,
-tipo/conferência, aviso de caminhada de 2 linhas, selo de conflito, "Remover da agenda" e
-**"Outras salvas nesse horário" já aberto**; a descrição fica no fim, pra não empurrar as ações
-pra fora da tela. Fecha no ✕, no backdrop e no Esc.
+Clicar no card abre um **modal** (bottom-sheet no mobile). **Ordem do conteúdo (fixada com a Carla
+em 2026-08-03):** trilha → conferência → título → `HH:MM–HH:MM · Prédio — Palco` → descrição →
+palestrantes → aviso de caminhada (2 linhas) → "Remover da agenda" → **"Outras salvas nesse horário"
+já aberto**. **Fora do modal:** o tipo (`Painel`), o selo "⚠ Conflito de horário" (a sobreposição já
+se vê no grid) e a nota "Continua nas salvas". Fecha no ✕, no backdrop e no Esc.
 O **card de intervalo entre cards saiu** (o grid já mostra o espaço) — `avaliarTrecho` e
 `construirHtmlTrecho` continuam, usados dentro do modal.
 `window.RIW.avaliarTrecho(ant, seg, matriz) → { custo, folga, nivel, mesmoPalco, de, para }`.
@@ -176,11 +177,11 @@ O **card de intervalo entre cards saiu** (o grid já mostra o espaço) — `aval
 | mesmo palco | `ok` | não renderiza card | — |
 | `folga − custo >= 10` | `ok` | cinza | `Você tem X min de intervalo` |
 | `folga >= custo` e sobra `< 10` | `apertado` | âmbar | `Você tem X min de intervalo` |
-| `folga >= 0` e `folga < custo` | `atrasado` | âmbar | `Você vai chegar com N min de atraso` |
-| `folga < 0` (sobreposição real) | `impossivel` | vermelho | `Você não vai chegar a tempo` |
-Regra da dona: **atraso causado só por deslocamento é âmbar**; vermelho só quando os horários se
-sobrepõem de verdade. O selo "⚠ Conflito de horário" dentro do card também só aparece em
-sobreposição real (`acharConflitos`, regra estrita — encostadas não conflitam).
+| `folga < custo` e chega antes do fim | `atrasado` | âmbar | `Você vai chegar com N min de atraso` |
+| chegada `>=` fim da palestra | `impossivel` | vermelho | `Você não vai chegar a tempo` |
+Regra da dona: a linha do relógio **sempre diz quantos minutos de atraso**; `Você não vai chegar a
+tempo` só quando a **chegada** (`fim da anterior + caminhada`) cai **depois do fim da seguinte** —
+sobreposição de horário sozinha não basta, se ainda dá pra pegar um pedaço é atraso (âmbar).
 ⚠️ **A matriz agora existe em DOIS lugares:** `distancias.json` (raiz) e `site/distancias.json` (a que o
 app carrega). Ao reeditar a matriz, **copie pra `site/`** — só a pasta `site/` vai pro Netlify.
 Objetivo: o plano final, enxuto, com os alertas.
