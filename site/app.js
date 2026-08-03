@@ -932,7 +932,7 @@
     return html;
   }
 
-  // ESCALA_PX_MIN: pixels por minuto no grid (~64px por hora, pedido
+  // ESCALA_PX_MIN: pixels por minuto no grid (fonte única da escala —
   // da Carla). ALTURA_MIN_CARD_PX evita que um card de 30 min (a menor
   // duração dos dados) fique pequeno demais pra ler. LARGURA_MIN_COLUNA_PX
   // é o mínimo por coluna quando muitos itens se sobrepõem — depois
@@ -1154,7 +1154,8 @@
     var rotulos = '';
     var linhas = '';
     for (var h = faixa.horaInicio; h <= faixa.horaFim; h++) {
-      var top = (h - faixa.horaInicio) * 64;
+      // mesma escala dos cards — hardcodar aqui desalinhava tudo
+      var top = (h - faixa.horaInicio) * 60 * ESCALA_PX_MIN;
       linhas += '<div class="agenda-grade__linha-hora" style="top:' + top + 'px"></div>';
       if (h < faixa.horaFim) {
         rotulos += '<div class="agenda-grade__rotulo-hora" style="top:' + top + 'px">' +
