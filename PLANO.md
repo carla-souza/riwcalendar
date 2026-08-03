@@ -91,7 +91,8 @@ Sem React, sem Vite, sem passo de compilação. Deploy no **Netlify** (arrastar 
 ---
 
 ## Seção 0B — Repositório no GitHub (deploy automático + editar do celular)
-**Status: ⬜ A fazer — é a PRIMEIRA seção, antes de escrever código.**
+**Status: ✅ Feita.** Repo público: https://github.com/carla-souza/riwcalendar (branch `main`,
+dados e mapa versionados, sem LFS). Falta só o passo 7 (Carla testar claude.ai/code pelo celular).
 Objetivo: ter o projeto versionado no GitHub desde o começo, por dois motivos práticos:
 1. **Netlify com deploy contínuo** — em vez de arrastar a pasta a cada mudança, o Netlify observa o
    repositório e republica sozinho a cada `push` (Seção 7).
@@ -120,7 +121,9 @@ Próximos passos:
    **antes** do evento, não no meio dele).
 
 ## Seção 1 — Estrutura base do site + estado
-**Status: ⬜ A fazer.**
+**Status: ✅ Feita.** `site/index.html` + `style.css` (tokens Trello, light/dark) + `app.js`
+(estado em `localStorage["riw_state"]`, roteamento por hash, `corDaTrilha` com 5 cores — o vermelho
+ficou reservado pros alertas). Regras de estado testadas em Node.
 Objetivo: esqueleto do app com as 3 abas e o gerenciamento de estado no localStorage.
 Próximos passos:
 1. Criar pasta `site/` (é a pasta que vai pro Netlify). Copiar `palestras.json` → `site/data.json`.

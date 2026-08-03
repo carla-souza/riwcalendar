@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>RIW Calendar</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="cabecalho">
+    <h1 class="cabecalho__titulo">RIW Calendar</h1>
+    <p class="cabecalho__subtitulo">Rio Innovation Week 2026</p>
+  </header>
+
+  <nav class="abas" aria-label="Navegação principal">
+    <button class="abas__botao" data-aba="programacao" type="button">Programação</button>
+    <button class="abas__botao" data-aba="salvas" type="button">Salvas</button>
+    <button class="abas__botao" data-aba="agenda" type="button">Agenda</button>
+    <button class="abas__botao" data-aba="mapa" type="button">Mapa</button>
+  </nav>
+
+  <main class="conteudo">
+    <section id="programacao" class="secao">
+      <h2 class="secao__titulo">Programação</h2>
+      <div id="programacao-conteudo" class="secao__corpo">
+        <p class="carregando">Carregando palestras…</p>
+      </div>
+    </section>
+
+    <section id="salvas" class="secao" hidden>
+      <h2 class="secao__titulo">Salvas</h2>
+      <div id="salvas-conteudo" class="secao__corpo">
+        <p class="placeholder">Em construção — chega numa próxima seção do plano.</p>
+      </div>
+    </section>
+
+    <section id="agenda" class="secao" hidden>
+      <h2 class="secao__titulo">Agenda</h2>
+      <div id="agenda-conteudo" class="secao__corpo">
+        <p class="placeholder">Em construção — chega numa próxima seção do plano.</p>
+      </div>
+    </section>
+
+    <section id="mapa" class="secao" hidden>
+      <h2 class="secao__titulo">Mapa</h2>
+      <div id="mapa-conteudo" class="secao__corpo">
+        <p class="placeholder">Em construção — chega numa próxima seção do plano.</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

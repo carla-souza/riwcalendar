@@ -1,0 +1,263 @@
+/* ===========================================================
+   RIW Calendar — estilos base
+   Design system de referência: Trello (iOS), adaptado pra web.
+   Mobile-first, sem framework, sem CDN externo.
+   =========================================================== */
+
+:root {
+  /* --- cor de ação --- */
+  --cor-acao: #0C66E4;
+  --cor-acao-pressed: #0055CC;
+  --cor-acao-tint: #E9F2FF;
+
+  /* --- texto --- */
+  --texto-primario: #172B4D;
+  --texto-secundario: #5E6C84;
+  --texto-terciario: #8993A4;
+  --texto-sobre-acao: #FFFFFF;
+
+  /* --- superfícies --- */
+  --superficie-card: #FFFFFF;
+  --superficie-lista: #F1F2F4;
+  --superficie-funda: #EBECF0;
+  --divisoria: #DFE1E6;
+  --borda-forte: #C1C7D0;
+
+  /* --- semânticas (alertas de conflito/distância) --- */
+  --sucesso: #1F845A;
+  --alerta-amber: #B65C02;
+  --alerta-vermelho: #C9372C;
+
+  /* --- cores de trilha (6 cores de label do Trello) --- */
+  --trilha-verde: #4BCE97;
+  --trilha-amarelo: #F5CD47;
+  --trilha-laranja: #FEA362;
+  --trilha-vermelho: #F87168;
+  --trilha-roxo: #9F8FEF;
+  --trilha-azul: #579DFF;
+
+  /* --- elevação --- */
+  --raio: 8px;
+  --sombra-card: rgba(9, 30, 66, 0.13) 0 1px 1px, rgba(9, 30, 66, 0.06) 0 0 1px;
+
+  /* --- fundo geral --- */
+  --canvas: #F7F8F9;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cor-acao: #579DFF;
+    --cor-acao-pressed: #85B8FF;
+    --cor-acao-tint: #09305C;
+
+    --texto-primario: #B6C2CF;
+    --texto-secundario: #9FADBC;
+    --texto-terciario: #738496;
+    --texto-sobre-acao: #10151A;
+
+    --superficie-card: #2C333A;
+    --superficie-lista: #22272B;
+    --superficie-funda: #1D2125;
+    --divisoria: #3A3F45;
+    --borda-forte: #454F59;
+
+    --sucesso: #4BCE97;
+    --alerta-amber: #F5CD47;
+    --alerta-vermelho: #F87168;
+
+    --canvas: #1D2125;
+  }
+}
+
+/* respeita override manual de tema (caso vier a existir toggle no futuro) */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--texto-primario);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  /* espaço pra nav fixa embaixo + área segura do celular */
+  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+}
+
+/* ---------- header ---------- */
+.cabecalho {
+  padding: 16px 16px 8px;
+  text-align: center;
+}
+
+.cabecalho__titulo {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--texto-primario);
+}
+
+.cabecalho__subtitulo {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--texto-secundario);
+}
+
+/* ---------- navegação de abas (fixa embaixo, estilo tab bar) ---------- */
+.abas {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  background: var(--superficie-card);
+  border-top: 1px solid var(--divisoria);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 10;
+}
+
+.abas__botao {
+  flex: 1 1 0;
+  min-height: 44px;
+  padding: 10px 4px;
+  border: none;
+  background: transparent;
+  color: var(--texto-secundario);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.abas__botao:active {
+  background: var(--superficie-lista);
+}
+
+.abas__botao[aria-current="page"] {
+  color: var(--cor-acao);
+}
+
+/* ---------- conteúdo / seções ---------- */
+.conteudo {
+  padding: 0 16px 16px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.secao__titulo {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 8px 0 12px;
+  color: var(--texto-primario);
+}
+
+.secao[hidden] {
+  display: none;
+}
+
+.placeholder,
+.carregando,
+.erro {
+  background: var(--superficie-card);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-card);
+  padding: 16px;
+  color: var(--texto-secundario);
+  font-size: 14px;
+}
+
+.erro {
+  color: var(--alerta-vermelho);
+  border: 1px solid var(--alerta-vermelho);
+}
+
+/* ---------- cards de palestra (base pra próximas seções) ---------- */
+.card {
+  background: var(--superficie-card);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-card);
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.card__badge-trilha {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: #172B4D;
+  margin-bottom: 6px;
+}
+
+.card__horario {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--texto-secundario);
+}
+
+.card__titulo {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--texto-primario);
+  margin: 4px 0;
+}
+
+.card__local {
+  font-size: 13px;
+  color: var(--texto-secundario);
+}
+
+.card__acoes {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.botao {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--raio);
+  border: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.botao--primario {
+  background: var(--cor-acao);
+  color: var(--texto-sobre-acao);
+}
+
+.botao--primario:active {
+  background: var(--cor-acao-pressed);
+}
+
+.botao--secundario {
+  background: var(--superficie-funda);
+  color: var(--texto-primario);
+}
+
+.botao--ativo {
+  background: var(--sucesso);
+  color: #FFFFFF;
+}
