@@ -116,8 +116,9 @@ agenda de quem já usa o app).
 **ADAPTAR iOS→web:** usar `px` no lugar de `pt`; **descartar** o que é específico de iOS/kanban (Dynamic Island, home indicator, arrastar card, board scroll horizontal, bottom sheet nativo). Nosso app é navegação por abas + listas/timelines, não um board Trello.
 
 **Stack (confirmada):** site **estático, sem build** — HTML + JavaScript puro + `data.json` embutido.
-Sem React, sem Vite, sem passo de compilação. Deploy no **Netlify** (arrastar a pasta). Estado no
-`localStorage`, **sem login**. Link compartilhável com outros participantes (cada um tem a própria agenda).
+Sem React, sem Vite, sem passo de compilação. Deploy contínuo no **Netlify** a partir do repositório
+no **GitHub** (publish dir `site/`, sem build command — Seção 0B/7). Estado no `localStorage`,
+**sem login**. Link compartilhável com outros participantes (cada um tem a própria agenda).
 
 **Regra de conflito de horário:** duas palestras do mesmo dia colidem se `inicio1 < fim2 && inicio2 < fim1`.
 
@@ -263,10 +264,13 @@ Como usar na aba Agenda:
 3. A matriz é fácil de reeditar em `distancias.json` (ver `regras` no arquivo) se quiser ajustar depois.
 
 ## Seção 6 — PostHog (pixel de acesso)
-**Status: ✅ Feita (2026-08-03).** Snippet padrão do PostHog no `<head>` do `site/index.html` com a
-project API key da Carla, `api_host: https://us.i.posthog.com`, `person_profiles: identified_only`.
-Pageview + autocapture (autocapture já cobre cliques nos botões de salvar/agenda, sem evento custom).
+**Status: ✅ Feita (2026-08-03), corrigida (2026-08-03).** Snippet padrão do PostHog no `<head>` do
+`site/index.html` com a project API key da Carla, `person_profiles: identified_only`. Pageview +
+autocapture (autocapture já cobre cliques nos botões de salvar/agenda, sem evento custom).
 Testado local (headless Chrome): página carrega, título correto, sem erro de app no console.
+Bug encontrado depois do deploy: o snippet original tinha `api_host: https://us.i.posthog.com`, mas
+o projeto da Carla é da região **EU** — eventos iam pro host errado e sumiam. Corrigido pra
+`api_host: https://eu.i.posthog.com` (snippet atual copiado direto dos settings do PostHog).
 
 ## Seção 7 — Deploy no Netlify (a partir do GitHub)
 **Status: ✅ Feita (2026-08-03).** Site no ar: **https://riwcalendar.netlify.app**. Achamos e

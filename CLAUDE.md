@@ -30,5 +30,7 @@ API pública sem auth: `https://api.rioinnovationweek.com.br/conferencia/ConfePu
 Programação muda ("sujeita a alterações") — re-buscar e regenerar `palestras.json` na véspera. Schema e
 detalhes no `PLANO.md`.
 
-## Pendências
-- Key do PostHog (pixel de acesso simples — Seção 6 do `PLANO.md`).
+## Status
+Todas as seções do `PLANO.md` (0 → 7) estão ✅ feitas — site no ar em https://riwcalendar.netlify.app,
+deploy contínuo a partir do `main` no GitHub, PostHog instalado. Pendências reais (rotina, não
+bloqueiam nada) ficam listadas em "Pendências com a Carla" no fim do `PLANO.md`.
