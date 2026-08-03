@@ -143,7 +143,9 @@ Próximos passos:
 4. Performance: são 1401 itens — renderizar só o subconjunto filtrado; evitar re-render pesado a cada tecla (debounce na busca).
 
 ## Seção 3 — Aba Salvas (decidir)
-**Status: ⬜ A fazer.**
+**Status: ✅ Feita.** Timeline por dia, conflitos marcados em âmbar com os títulos das concorrentes,
++/− Agenda e Remover das salvas, contagem "N salvas · M na agenda", estado vazio.
+`window.RIW.acharConflitos(lista) → { id: [ids que colidem] }` é a função pura reusada pela Agenda.
 Objetivo: ver as salvas em timeline por dia pra escolher o que vira agenda.
 Próximos passos:
 1. Timeline por dia, ordenada por horário, só itens salvos.

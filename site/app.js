@@ -12,6 +12,7 @@
   // -----------------------------------------------------------
   var PALESTRAS = []; // preenchido depois do fetch
   var DADOS_CARREGADOS = false;
+  var PALESTRAS_POR_ID = {}; // índice id → palestra, montado junto com PALESTRAS
 
   function carregarDados() {
     return fetch('data.json')
@@ -22,8 +23,16 @@
       .then(function (json) {
         PALESTRAS = Array.isArray(json) ? json : [];
         DADOS_CARREGADOS = true;
+        PALESTRAS_POR_ID = {};
+        for (var i = 0; i < PALESTRAS.length; i++) {
+          PALESTRAS_POR_ID[PALESTRAS[i].id] = PALESTRAS[i];
+        }
         return PALESTRAS;
       });
+  }
+
+  function getPalestraPorId(id) {
+    return PALESTRAS_POR_ID[id];
   }
 
   // -----------------------------------------------------------
@@ -549,6 +558,219 @@
   }
 
   // -----------------------------------------------------------
+  // Seção 3 — Aba Salvas: timeline + conflitos de horário
+  // -----------------------------------------------------------
+
+  // compararDiaHorario(a, b) — ordena por dia e depois por início.
+  function compararDiaHorario(a, b) {
+    if (a.dia !== b.dia) return a.dia < b.dia ? -1 : 1;
+    if (a.inicio !== b.inicio) return a.inicio < b.inicio ? -1 : 1;
+    return 0;
+  }
+
+  // acharConflitos(lista) — função pura: recebe uma lista de palestras
+  // (cada uma com id, dia, inicio, fim) e devolve um objeto
+  // { id: [ids que colidem com ele] }. Regra do PLANO.md: duas palestras
+  // do MESMO dia colidem se inicio1 < fim2 && inicio2 < fim1 (encostadas
+  // não colidem). Não lê estado nenhum — recebe a lista pronta, pra
+  // poder ser reusada pela Agenda (Seção 4) com outra lista de entrada.
+  function acharConflitos(lista) {
+    var itens = lista || [];
+    var resultado = {};
+    for (var i = 0; i < itens.length; i++) {
+      resultado[itens[i].id] = [];
+    }
+    for (var i = 0; i < itens.length; i++) {
+      for (var j = i + 1; j < itens.length; j++) {
+        var a = itens[i];
+        var b = itens[j];
+        if (a.dia !== b.dia) continue;
+        if (a.inicio < b.fim && b.inicio < a.fim) {
+          resultado[a.id].push(b.id);
+          resultado[b.id].push(a.id);
+        }
+      }
+    }
+    return resultado;
+  }
+
+  // truncarTexto(s, n) — corta título comprido pro rótulo de conflito.
+  function truncarTexto(s, n) {
+    s = String(s || '');
+    return s.length > n ? s.slice(0, n - 1) + '…' : s;
+  }
+
+  // resumoConflitantes(ids, mapaPorId) — "Título A; Título B e mais N",
+  // é o jeito simples de deixar claro QUEM compete no mesmo horário
+  // (passo 4, "bom ter", do PLANO.md) sem inventar UI nova.
+  var TITULOS_CONFLITO_MAX = 2;
+  function resumoConflitantes(ids, mapaPorId) {
+    var titulos = [];
+    for (var i = 0; i < ids.length && titulos.length < TITULOS_CONFLITO_MAX; i++) {
+      var pal = mapaPorId[ids[i]];
+      if (pal) titulos.push(truncarTexto(pal.titulo, 28));
+    }
+    var resto = ids.length - titulos.length;
+    var texto = titulos.join('; ');
+    if (resto > 0) texto += (texto ? ' e mais ' : 'mais ') + resto;
+    return texto;
+  }
+
+  // card da Salvas: mesma estrutura visual do card da Programação, mas
+  // com ações diferentes (+Agenda/−Agenda + Remover das salvas) e
+  // marca de conflito/"na agenda".
+  function construirHtmlCardSalva(p, conflitantes, mapaPorId) {
+    var cor = corDaTrilha(p.trilha);
+    var agendada = naAgenda(p.id);
+    var temConflito = conflitantes && conflitantes.length > 0;
+
+    var local = p.predio || '';
+    if (p.palco) local += ' — ' + p.palco;
+
+    var nomes = '';
+    if (Array.isArray(p.palestrantes) && p.palestrantes.length) {
+      nomes = p.palestrantes.map(function (pal) { return pal && pal.nome; })
+        .filter(Boolean).join(', ');
+    }
+
+    var classes = 'card';
+    // conflito é o alerta mais urgente (âmbar); "na agenda" só marca a
+    // borda quando não há conflito — o rótulo "● Na agenda" aparece
+    // sempre, independente da borda.
+    if (temConflito) classes += ' card--conflito';
+    else if (agendada) classes += ' card--na-agenda';
+
+    var html = '<article class="' + classes + '" data-card-id="' + p.id + '">';
+    html += '<span class="card__badge-trilha" style="background:' + cor + '">' +
+      escaparHtml(normalizarTrilha(p.trilha)) + '</span>';
+    html += '<div class="card__horario">' + escaparHtml(p.inicio) + '–' + escaparHtml(p.fim) +
+      ' <span class="card__tag-agenda"' + (agendada ? '' : ' hidden') + '>● Na agenda</span></div>';
+    html += '<h4 class="card__titulo">' + escaparHtml(p.titulo) + '</h4>';
+    html += '<div class="card__local">' + escaparHtml(local) + '</div>';
+    if (nomes) {
+      html += '<div class="card__palestrantes">' + escaparHtml(nomes) + '</div>';
+    }
+    if (temConflito) {
+      html += '<div class="card__conflito">⚠ Conflito com ' + conflitantes.length +
+        (conflitantes.length === 1 ? ' outra: ' : ' outras: ') +
+        escaparHtml(resumoConflitantes(conflitantes, mapaPorId)) + '</div>';
+    }
+    html += '<div class="card__acoes">';
+    html += '<button type="button" class="botao ' + (agendada ? 'botao--ativo' : 'botao--secundario') +
+      '" data-acao="agenda" data-id="' + p.id + '" aria-pressed="' + agendada + '">' +
+      (agendada ? '− Agenda' : '+ Agenda') + '</button>';
+    html += '<button type="button" class="botao botao--secundario" data-acao="remover" data-id="' + p.id + '">' +
+      'Remover das salvas</button>';
+    html += '</div>';
+    html += '</article>';
+    return html;
+  }
+
+  // agrupa por dia (a lista já vem ordenada por dia/inicio)
+  function construirHtmlListaSalvas(itens, conflitos, mapaPorId) {
+    var partes = [];
+    var diaAtual = null;
+    for (var i = 0; i < itens.length; i++) {
+      var p = itens[i];
+      if (p.dia !== diaAtual) {
+        diaAtual = p.dia;
+        partes.push('<h3 class="lista__cabecalho-dia">' + escaparHtml(formatarCabecalhoDia(p.dia)) + '</h3>');
+      }
+      partes.push(construirHtmlCardSalva(p, conflitos[p.id] || [], mapaPorId));
+    }
+    return partes.join('');
+  }
+
+  // atualiza só a contagem do topo ("N salvas · M na agenda"), sem
+  // re-renderizar a timeline inteira.
+  function atualizarContagemSalvas() {
+    var el = document.querySelector('#salvas-conteudo .filtros__contagem');
+    if (!el) return;
+    var estado = getState();
+    var lista = estado.salvas.map(getPalestraPorId).filter(Boolean);
+    var qtdAgenda = lista.filter(function (p) { return naAgenda(p.id); }).length;
+    el.textContent = lista.length + (lista.length === 1 ? ' salva' : ' salvas') +
+      ' · ' + qtdAgenda + ' na agenda';
+  }
+
+  // atualiza só o card afetado (+Agenda/−Agenda não muda o tamanho da
+  // lista nem os conflitos dos vizinhos, então não precisa re-renderizar
+  // tudo — só remover das salvas precisa, ver aoClicarSalvas).
+  function atualizarCardSalva(id) {
+    var card = document.querySelector('#salvas-conteudo .card[data-card-id="' + id + '"]');
+    if (!card) return;
+    var agendada = naAgenda(id);
+
+    var btn = card.querySelector('[data-acao="agenda"]');
+    if (btn) {
+      btn.className = 'botao ' + (agendada ? 'botao--ativo' : 'botao--secundario');
+      btn.setAttribute('aria-pressed', String(agendada));
+      btn.textContent = agendada ? '− Agenda' : '+ Agenda';
+    }
+
+    var tag = card.querySelector('.card__tag-agenda');
+    if (tag) tag.hidden = !agendada;
+
+    // a borda de conflito (âmbar) tem prioridade visual; só alterna a
+    // borda "na agenda" quando o card não estiver marcado em conflito
+    if (!card.classList.contains('card--conflito')) {
+      card.classList.toggle('card--na-agenda', agendada);
+    }
+
+    atualizarContagemSalvas();
+  }
+
+  // delegação de eventos: um único listener no container da timeline
+  function aoClicarSalvas(evento) {
+    var botao = evento.target.closest('button[data-acao]');
+    if (!botao) return;
+    var id = Number(botao.getAttribute('data-id'));
+    var acao = botao.getAttribute('data-acao');
+
+    if (acao === 'agenda') {
+      toggleAgenda(id);
+      atualizarCardSalva(id);
+    } else if (acao === 'remover') {
+      toggleSalva(id);
+      // sai da lista → re-renderiza a timeline inteira (recalcula
+      // conflitos dos vizinhos, que mudam quando este item some)
+      renderizarListaSalvas();
+    }
+  }
+
+  var salvasInicializada = false;
+
+  // renderizarListaSalvas() — sempre relê o estado do zero (sem cache),
+  // pra ficar em sincronia com o que foi feito na aba Programação.
+  function renderizarListaSalvas() {
+    var elConteudo = document.getElementById('salvas-conteudo');
+    if (!elConteudo) return;
+
+    var estado = getState();
+    var listaSalvas = estado.salvas.map(getPalestraPorId).filter(Boolean);
+    listaSalvas.sort(compararDiaHorario);
+
+    if (listaSalvas.length === 0) {
+      elConteudo.innerHTML = '<p class="lista__vazio">Nenhuma palestra salva ainda. ' +
+        'Salve palestras na aba Programação pra triar aqui.</p>';
+      return;
+    }
+
+    var mapaPorId = {};
+    listaSalvas.forEach(function (p) { mapaPorId[p.id] = p; });
+
+    var conflitos = acharConflitos(listaSalvas);
+    var qtdAgenda = listaSalvas.filter(function (p) { return naAgenda(p.id); }).length;
+
+    var html = '<p class="filtros__contagem">' + listaSalvas.length +
+      (listaSalvas.length === 1 ? ' salva' : ' salvas') +
+      ' · ' + qtdAgenda + ' na agenda</p>';
+    html += construirHtmlListaSalvas(listaSalvas, conflitos, mapaPorId);
+
+    elConteudo.innerHTML = html;
+  }
+
+  // -----------------------------------------------------------
   // Roteamento por hash (#programacao, #salvas, #agenda, #mapa)
   // -----------------------------------------------------------
   var ABAS_VALIDAS = ['programacao', 'salvas', 'agenda', 'mapa'];
@@ -577,7 +799,23 @@
   }
 
   function renderSalvas() {
-    // stub — implementado na Seção 3 do PLANO.md
+    var elConteudo = document.getElementById('salvas-conteudo');
+    if (!elConteudo) return;
+
+    if (!DADOS_CARREGADOS) {
+      elConteudo.innerHTML = '<p class="carregando">Carregando palestras…</p>';
+      return;
+    }
+
+    // listener de delegação ligado só uma vez no container (o container
+    // em si nunca é substituído, só o innerHTML dele)
+    if (!salvasInicializada) {
+      elConteudo.addEventListener('click', aoClicarSalvas);
+      salvasInicializada = true;
+    }
+
+    // relê o estado do zero sempre que a aba abre — nada de cache
+    renderizarListaSalvas();
   }
 
   function renderAgenda() {
@@ -686,6 +924,8 @@
     // Seção 2 — expostas pra teste puro em Node (sem navegador)
     escaparHtml: escaparHtml,
     normalizarTexto: normalizarTexto,
-    filtrarPalestras: filtrarPalestras
+    filtrarPalestras: filtrarPalestras,
+    // Seção 3 — regra de conflito, genérica (a Seção 4/Agenda reusa)
+    acharConflitos: acharConflitos
   };
 })();

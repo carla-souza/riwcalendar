@@ -410,3 +410,28 @@ body {
   color: var(--texto-secundario);
   margin-top: 2px;
 }
+
+/* ---------- aba Salvas (Seção 3) — conflito e "na agenda" ---------- */
+/* faixa âmbar à esquerda: alerta ameno de conflito (o vermelho fica
+   reservado pro alerta forte da Agenda, Seção 4) */
+.card--conflito {
+  border-left: 4px solid var(--alerta-amber);
+}
+
+/* faixa azul de ação: item que já está no plano (Agenda) */
+.card--na-agenda {
+  border-left: 4px solid var(--cor-acao);
+}
+
+.card__tag-agenda {
+  margin-left: 4px;
+  color: var(--cor-acao);
+  font-weight: 700;
+}
+
+.card__conflito {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--alerta-amber);
+}
