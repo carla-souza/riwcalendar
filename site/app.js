@@ -13,9 +13,12 @@
   var PALESTRAS = []; // preenchido depois do fetch
   var DADOS_CARREGADOS = false;
   var PALESTRAS_POR_ID = {}; // índice id → palestra, montado junto com PALESTRAS
+  var MATRIZ_DISTANCIAS = null; // Seção 5 — { predio_base: { predio_base: minutos } }; null se não carregou
 
+  // carrega data.json (obrigatório) e distancias.json (opcional — Seção 4
+  // usa pra avisos de distância, mas o app não pode quebrar sem ele).
   function carregarDados() {
-    return fetch('data.json')
+    var carregarPalestras = fetch('data.json')
       .then(function (resp) {
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         return resp.json();
@@ -29,6 +32,25 @@
         }
         return PALESTRAS;
       });
+
+    var carregarMatriz = fetch('distancias.json')
+      .then(function (resp) {
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp.json();
+      })
+      .then(function (json) {
+        MATRIZ_DISTANCIAS = (json && json.matriz) || null;
+      })
+      .catch(function (erro) {
+        // degrade suave: Agenda funciona sem os avisos de distância
+        console.warn('riw: não deu pra carregar distancias.json, ' +
+          'Agenda vai ficar sem os avisos de distância.', erro);
+        MATRIZ_DISTANCIAS = null;
+      });
+
+    return Promise.all([carregarPalestras, carregarMatriz]).then(function () {
+      return PALESTRAS;
+    });
   }
 
   function getPalestraPorId(id) {
@@ -771,6 +793,242 @@
   }
 
   // -----------------------------------------------------------
+  // Seção 4 — Aba Agenda: timeline enxuta + conflito (vermelho,
+  // mais grave que o âmbar da Salvas) + alerta de distância entre
+  // itens consecutivos (usa a matriz da Seção 5, distancias.json).
+  // -----------------------------------------------------------
+
+  // minutosDoHorario("HH:MM") → inteiro de minutos desde 00:00.
+  // NaN se o formato vier estranho (não trava o app, só não alerta).
+  function minutosDoHorario(horario) {
+    var partes = String(horario || '').split(':');
+    var h = Number(partes[0]);
+    var m = Number(partes[1]);
+    if (!isFinite(h) || !isFinite(m)) return NaN;
+    return h * 60 + m;
+  }
+
+  // avaliarTrecho(anterior, seguinte, matriz) — função pura, o coração
+  // da Seção 4. Recebe duas palestras consecutivas (mesmo dia, já
+  // ordenadas por horário) e a matriz de distâncias (pode ser null).
+  //
+  // → { custo, folga, nivel, mesmoPalco, de, para }
+  // - mesmoPalco: só true quando os dois têm `palco` não-nulo, MESMO
+  //   `predio` e MESMO `palco` (armadilha real dos dados: `palco` é
+  //   null em 142 registros, e o mesmo texto de palco existe em prédios
+  //   diferentes — por isso o predio precisa bater também).
+  // - custo: 0 se mesmoPalco; senão matriz[predio_base_ant][predio_base_seg];
+  //   null se a matriz não tiver esse par (dado desconhecido — não inventa número).
+  // - folga: minutos(seguinte.inicio) − minutos(anterior.fim). Pode ser
+  //   negativa quando as palestras se sobrepõem.
+  // - nivel: 'impossivel' (folga < custo — alerta forte, vermelho),
+  //   'apertado' (folga >= custo mas folga − custo < 10 — aviso âmbar),
+  //   'ok' (folga sobra, custo desconhecido, ou mesmoPalco — nesse
+  //   último caso "sem aviso nenhum" vale como 'ok', não se avalia risco).
+  // - de/para: predio_base de origem/destino, pra montar o rótulo
+  //   "Armazém 1 → Kobra".
+  function avaliarTrecho(anterior, seguinte, matriz) {
+    var mesmoPalco = !!(anterior.palco && seguinte.palco &&
+      anterior.predio === seguinte.predio && anterior.palco === seguinte.palco);
+
+    var custo;
+    if (mesmoPalco) {
+      custo = 0;
+    } else {
+      custo = null;
+      if (matriz && matriz[anterior.predio_base] &&
+        typeof matriz[anterior.predio_base][seguinte.predio_base] === 'number') {
+        custo = matriz[anterior.predio_base][seguinte.predio_base];
+      }
+    }
+
+    var folga = minutosDoHorario(seguinte.inicio) - minutosDoHorario(anterior.fim);
+
+    var nivel;
+    if (mesmoPalco) {
+      nivel = 'ok'; // mesmo palco: fica no lugar, sem aviso — nunca é risco
+    } else if (custo == null) {
+      nivel = 'ok'; // sem dado de distância — não alarma
+    } else if (folga < custo) {
+      nivel = 'impossivel';
+    } else if (folga - custo < 10) {
+      nivel = 'apertado';
+    } else {
+      nivel = 'ok';
+    }
+
+    return {
+      custo: custo,
+      folga: folga,
+      nivel: nivel,
+      mesmoPalco: mesmoPalco,
+      de: anterior.predio_base,
+      para: seguinte.predio_base
+    };
+  }
+
+  // candidatasMesmoHorario(item, todasSalvas) — salvas que NÃO estão na
+  // agenda e colidem no horário com `item` (mesma regra de conflito),
+  // pro atalho "ver outras salvas nesse horário" (plano B de fila/lotação).
+  function candidatasMesmoHorario(item, todasSalvas) {
+    return (todasSalvas || []).filter(function (s) {
+      if (s.id === item.id) return false;
+      if (naAgenda(s.id)) return false;
+      if (s.dia !== item.dia) return false;
+      return s.inicio < item.fim && item.inicio < s.fim;
+    });
+  }
+
+  function construirHtmlOutrasSalvas(item, candidatas) {
+    if (!candidatas.length) return '';
+    var html = '<details class="agenda-item__outras">';
+    html += '<summary>Ver outras salvas nesse horário (' + candidatas.length + ')</summary>';
+    html += '<div class="agenda-item__outras-lista">';
+    candidatas.forEach(function (c) {
+      var local = c.predio || '';
+      if (c.palco) local += ' — ' + c.palco;
+      html += '<div class="agenda-item__outras-item">';
+      html += '<div class="agenda-item__outras-info">';
+      html += '<strong>' + escaparHtml(c.titulo) + '</strong>';
+      html += '<span>' + escaparHtml(c.inicio) + '–' + escaparHtml(c.fim) + ' · ' + escaparHtml(local) + '</span>';
+      html += '</div>';
+      html += '<button type="button" class="botao botao--secundario" data-acao="promover" data-id="' +
+        c.id + '">+ Agenda</button>';
+      html += '</div>';
+    });
+    html += '</div></details>';
+    return html;
+  }
+
+  // card enxuto da Agenda: prioriza horário e local (é a aba de
+  // executar no dia); palestrantes ficam de fora de propósito.
+  function construirHtmlCardAgenda(p, conflitantes, todasSalvas) {
+    var cor = corDaTrilha(p.trilha);
+    var temConflito = conflitantes && conflitantes.length > 0;
+
+    var local = p.predio || '';
+    if (p.palco) local += ' — ' + p.palco;
+
+    var classes = 'card agenda-item';
+    if (temConflito) classes += ' card--conflito-grave';
+
+    var html = '<article class="' + classes + '" data-card-id="' + p.id + '">';
+    html += '<span class="card__badge-trilha" style="background:' + cor + '">' +
+      escaparHtml(normalizarTrilha(p.trilha)) + '</span>';
+    html += '<div class="card__horario">' + escaparHtml(p.inicio) + '–' + escaparHtml(p.fim) + '</div>';
+    html += '<h4 class="card__titulo">' + escaparHtml(p.titulo) + '</h4>';
+    html += '<div class="card__local">' + escaparHtml(local) + '</div>';
+    if (temConflito) {
+      html += '<div class="card__conflito card__conflito--grave">⚠ Conflito de horário com ' +
+        conflitantes.length + (conflitantes.length === 1 ? ' outra palestra da agenda' : ' outras palestras da agenda') +
+        '</div>';
+    }
+    html += '<div class="card__acoes">';
+    html += '<button type="button" class="botao botao--secundario" data-acao="remover-agenda" data-id="' +
+      p.id + '">Remover da agenda</button>';
+    html += '</div>';
+    html += '<p class="agenda-item__nota">Continua nas salvas.</p>';
+    html += construirHtmlOutrasSalvas(p, candidatasMesmoHorario(p, todasSalvas));
+    html += '</article>';
+    return html;
+  }
+
+  // construirHtmlTrecho(avaliacao) — o aviso vive ENTRE dois cards, não
+  // dentro deles. Mesmo palco: sem linha nenhuma (não polui a timeline).
+  function construirHtmlTrecho(avaliacao) {
+    if (avaliacao.mesmoPalco) return '';
+
+    var texto;
+    if (avaliacao.custo == null) {
+      // dado desconhecido: avisa que são prédios diferentes sem inventar minutos
+      texto = '🚶 ' + escaparHtml(avaliacao.de) + ' → ' + escaparHtml(avaliacao.para) +
+        ' — distância desconhecida';
+    } else {
+      // mesmo prédio (só troca de palco) não vira "Armazém 3 → Armazém 3"
+      var rota = avaliacao.de === avaliacao.para
+        ? 'outro palco no ' + escaparHtml(avaliacao.de)
+        : escaparHtml(avaliacao.de) + ' → ' + escaparHtml(avaliacao.para);
+      texto = '🚶 ~' + avaliacao.custo + ' min — ' + rota;
+      if (avaliacao.folga >= 0) {
+        texto += ' · ' + avaliacao.folga + ' min de folga';
+      } else {
+        texto += ' · se sobrepõe em ' + Math.abs(avaliacao.folga) + ' min';
+      }
+      if (avaliacao.nivel === 'impossivel') {
+        texto += ' — ⚠ Não dá tempo: precisa de ~' + avaliacao.custo + ' min' +
+          (avaliacao.folga >= 0 ? ' e só tem ' + avaliacao.folga : '') + '.';
+      } else if (avaliacao.nivel === 'apertado') {
+        texto += ' — corre que dá.';
+      }
+    }
+
+    return '<div class="trecho trecho--' + avaliacao.nivel + '">' + texto + '</div>';
+  }
+
+  // agrupa por dia e intercala os trechos de distância entre cards
+  // consecutivos do MESMO dia (o par nunca cruza a virada de dia).
+  function construirHtmlTimelineAgenda(itens, conflitos, todasSalvas, matriz) {
+    var partes = [];
+    var diaAtual = null;
+    var anteriorMesmoDia = null;
+    for (var i = 0; i < itens.length; i++) {
+      var p = itens[i];
+      if (p.dia !== diaAtual) {
+        diaAtual = p.dia;
+        anteriorMesmoDia = null;
+        partes.push('<h3 class="lista__cabecalho-dia">' + escaparHtml(formatarCabecalhoDia(p.dia)) + '</h3>');
+      }
+      if (anteriorMesmoDia) {
+        partes.push(construirHtmlTrecho(avaliarTrecho(anteriorMesmoDia, p, matriz)));
+      }
+      partes.push(construirHtmlCardAgenda(p, conflitos[p.id] || [], todasSalvas));
+      anteriorMesmoDia = p;
+    }
+    return partes.join('');
+  }
+
+  // renderizarAgenda() — relê o estado do zero (sem cache); qualquer
+  // ação (remover/promover) muda membros da lista, então sempre
+  // re-renderiza a timeline inteira (conflitos e trechos mudam junto).
+  function renderizarAgenda() {
+    var elConteudo = document.getElementById('agenda-conteudo');
+    if (!elConteudo) return;
+
+    var estado = getState();
+    var listaAgenda = estado.agenda.map(getPalestraPorId).filter(Boolean);
+    listaAgenda.sort(compararDiaHorario);
+
+    if (listaAgenda.length === 0) {
+      elConteudo.innerHTML = '<p class="lista__vazio">Nada na agenda ainda. ' +
+        'Adicione a partir das Salvas ou da Programação.</p>';
+      return;
+    }
+
+    var todasSalvas = estado.salvas.map(getPalestraPorId).filter(Boolean);
+    var conflitos = acharConflitos(listaAgenda);
+
+    var html = '<p class="filtros__contagem">' + listaAgenda.length + ' na agenda</p>';
+    html += construirHtmlTimelineAgenda(listaAgenda, conflitos, todasSalvas, MATRIZ_DISTANCIAS);
+
+    elConteudo.innerHTML = html;
+  }
+
+  // delegação de eventos: um único listener no container da timeline
+  function aoClicarAgenda(evento) {
+    var botao = evento.target.closest('button[data-acao]');
+    if (!botao) return;
+    var id = Number(botao.getAttribute('data-id'));
+    var acao = botao.getAttribute('data-acao');
+
+    if (acao === 'remover-agenda' || acao === 'promover') {
+      toggleAgenda(id);
+      renderizarAgenda(); // membros da lista mudaram: refaz conflitos e trechos
+    }
+  }
+
+  var agendaInicializada = false;
+
+  // -----------------------------------------------------------
   // Roteamento por hash (#programacao, #salvas, #agenda, #mapa)
   // -----------------------------------------------------------
   var ABAS_VALIDAS = ['programacao', 'salvas', 'agenda', 'mapa'];
@@ -819,7 +1077,23 @@
   }
 
   function renderAgenda() {
-    // stub — implementado na Seção 4 do PLANO.md
+    var elConteudo = document.getElementById('agenda-conteudo');
+    if (!elConteudo) return;
+
+    if (!DADOS_CARREGADOS) {
+      elConteudo.innerHTML = '<p class="carregando">Carregando palestras…</p>';
+      return;
+    }
+
+    // listener de delegação ligado só uma vez no container (o container
+    // em si nunca é substituído, só o innerHTML dele)
+    if (!agendaInicializada) {
+      elConteudo.addEventListener('click', aoClicarAgenda);
+      agendaInicializada = true;
+    }
+
+    // relê o estado do zero sempre que a aba abre — nada de cache
+    renderizarAgenda();
   }
 
   function renderMapa() {
@@ -926,6 +1200,12 @@
     normalizarTexto: normalizarTexto,
     filtrarPalestras: filtrarPalestras,
     // Seção 3 — regra de conflito, genérica (a Seção 4/Agenda reusa)
-    acharConflitos: acharConflitos
+    acharConflitos: acharConflitos,
+    // Seção 4 — distância entre itens consecutivos da Agenda
+    minutosDoHorario: minutosDoHorario,
+    avaliarTrecho: avaliarTrecho,
+    getMatrizDistancias: function () {
+      return MATRIZ_DISTANCIAS;
+    }
   };
 })();

@@ -435,3 +435,99 @@ body {
   font-weight: 600;
   color: var(--alerta-amber);
 }
+
+/* ---------- aba Agenda (Seção 4) — conflito grave, trechos, "outras salvas" ---------- */
+/* conflito DENTRO da agenda é grave (o plano diz "idealmente zero"),
+   por isso vermelho — diferente do âmbar da Salvas. */
+.card--conflito-grave {
+  border-left: 4px solid var(--alerta-vermelho);
+}
+
+.card__conflito--grave {
+  color: var(--alerta-vermelho);
+}
+
+.agenda-item__nota {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--texto-terciario);
+}
+
+/* trecho de distância: vive ENTRE dois cards, não dentro deles */
+.trecho {
+  margin: 6px 0;
+  padding: 8px 10px;
+  border-radius: var(--raio);
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.trecho--ok {
+  background: var(--superficie-lista);
+  color: var(--texto-secundario);
+  font-weight: 400;
+}
+
+.trecho--apertado {
+  background: var(--acao-fundo-apertado, rgba(182, 92, 2, 0.14));
+  color: var(--alerta-amber);
+}
+
+.trecho--impossivel {
+  background: var(--acao-fundo-impossivel, rgba(201, 55, 44, 0.14));
+  color: var(--alerta-vermelho);
+  font-weight: 700;
+}
+
+/* "ver outras salvas nesse horário" — sem modal, <details> nativo */
+.agenda-item__outras {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.agenda-item__outras summary {
+  cursor: pointer;
+  color: var(--cor-acao);
+  font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.agenda-item__outras-lista {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agenda-item__outras-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--superficie-lista);
+  border-radius: var(--raio);
+  padding: 6px 8px;
+}
+
+.agenda-item__outras-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--texto-secundario);
+}
+
+.agenda-item__outras-info strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--texto-primario);
+  overflow-wrap: anywhere;
+}
+
+.agenda-item__outras-item .botao {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 12px;
+}

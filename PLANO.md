@@ -154,7 +154,12 @@ Próximos passos:
 4. (Bom ter) a partir de um horário, deixar claro quais salvas competem no mesmo slot.
 
 ## Seção 4 — Aba Agenda (executar no dia)
-**Status: ⬜ A fazer.**
+**Status: ✅ Feita.** Timeline enxuta por dia, conflito em vermelho (mais grave que o âmbar das Salvas),
+aviso de distância ENTRE os cards (`ok`/`apertado`/`impossivel`), "Remover da agenda" (mantém salva) e
+o atalho `<details>` "Ver outras salvas nesse horário" com "+ Agenda" pra troca rápida.
+`window.RIW.avaliarTrecho(ant, seg, matriz) → { custo, folga, nivel, mesmoPalco, de, para }`.
+⚠️ **A matriz agora existe em DOIS lugares:** `distancias.json` (raiz) e `site/distancias.json` (a que o
+app carrega). Ao reeditar a matriz, **copie pra `site/`** — só a pasta `site/` vai pro Netlify.
 Objetivo: o plano final, enxuto, com os alertas.
 Próximos passos:
 1. Timeline por dia só com itens da agenda.
