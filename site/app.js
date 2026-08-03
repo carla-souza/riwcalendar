@@ -1067,16 +1067,21 @@
   // card resumido dentro do grid: só chip de caminhada (se houver) +
   // título truncado + horário (se o card for alto o bastante). Nada de
   // palestrantes/local/conflito aqui — isso tudo foi pro modal.
-  function construirHtmlCardGradeAgenda(p, itensMesmoDia, pos, horaInicioFaixa) {
+  function construirHtmlCardGradeAgenda(p, itensMesmoDia, pos, horaInicioFaixa, maxColunas) {
     var coluna = pos ? pos.coluna : 0;
-    var totalColunas = pos ? pos.totalColunas : 1;
     var inicioMin = minutosDoHorario(p.inicio);
     var fimMin = minutosDoHorario(p.fim);
 
     var top = (inicioMin - horaInicioFaixa * 60) * ESCALA_PX_MIN;
     var altura = Math.max(ALTURA_MIN_CARD_PX, (fimMin - inicioMin) * ESCALA_PX_MIN);
-    var left = (coluna / totalColunas) * 100;
-    var largura = 'calc(' + (100 / totalColunas) + '% - 2px)';
+    // largura/posição usam maxColunas (o pico de sobreposição DO DIA
+    // INTEIRO, mesmo valor que define o min-width do container), não o
+    // totalColunas do cluster local — senão um cluster de 2 cards num dia
+    // com um pico de 6 herda 1/2 da largura do container de 6 colunas
+    // (cards enormes) e, se o 2º cair fora da faixa visível do scroll
+    // (que abre em 0), some sem nenhuma pista de que tem mais pra direita.
+    var left = (coluna / maxColunas) * 100;
+    var largura = 'calc(' + (100 / maxColunas) + '% - 2px)';
     var cor = corDaTrilha(p.trilha);
 
     var anterior = acharAnteriorAgenda(p, itensMesmoDia);
@@ -1135,7 +1140,7 @@
     }
 
     var cardsHtml = itens.map(function (p) {
-      return construirHtmlCardGradeAgenda(p, itens, mapaPos[p.id], faixa.horaInicio);
+      return construirHtmlCardGradeAgenda(p, itens, mapaPos[p.id], faixa.horaInicio, maxColunas);
     }).join('');
 
     var html = '<div class="agenda-grade">';
