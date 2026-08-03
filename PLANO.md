@@ -95,11 +95,15 @@ Regras:
 - Remover das salvas → sai de tudo (inclusive da agenda).
 - Estado no navegador: duas listas de IDs. `localStorage["riw_state"] = { salvas: [id...], agenda: [id...] }`.
 
-**Quatro abas (decidido — não é filtro):**
-- **Programação** — lista por dia, filtros + busca. Cada card com ações "Salvar" e "+ Agenda".
-- **Salvas** — timeline por dia (igual agenda) pra ENXERGAR conflitos entre as salvas e promover pra agenda.
-- **Agenda** — timeline enxuta do plano + alerta de conflito + alerta de distância. Remover mantém salva.
+**Três abas** (eram quatro; a aba Salvas virou filtro em 2026-08-03 — ver abaixo):
+- **Programação** — lista por dia, filtros + busca + **chip toggle "Tenho interesse"**. Cada card com ações "Tenho interesse" e "+ Agenda".
+- **Agenda** — timeline enxuta do plano + alerta de conflito + alerta de distância. Remover mantém o interesse.
 - **Mapa** — imagem da planta oficial do evento como referência visual (pra se localizar entre os prédios/palcos).
+
+**Vocabulário na UI (2026-08-03):** o que o código chama de `salvas` a UI chama de **"Tenho interesse"**.
+A troca é só de texto visível — a chave `localStorage["riw_state"]`, o campo `salvas` e as funções
+`toggleSalva`/`isSalva` continuam com o nome antigo **de propósito** (renomear a chave apagaria a
+agenda de quem já usa o app).
 
 **Design (ver `DESIGN.md`):** base é o design system do **Trello (app iOS)** — sóbrio, legível, mobile-first. O que aproveitar:
 - **Cores semânticas de alerta** (âmbar "due soon", vermelho "overdue", verde "done") → usar direto nos avisos de **conflito de horário** e **distância** da Agenda.
@@ -162,7 +166,7 @@ ficou reservado pros alertas). Regras de estado testadas em Node.
 Objetivo: esqueleto do app com as 3 abas e o gerenciamento de estado no localStorage.
 Próximos passos:
 1. Criar pasta `site/` (é a pasta que vai pro Netlify). Copiar `palestras.json` → `site/data.json`.
-2. `site/index.html`: mobile-first, CSS embutido (ou `site/style.css`). Header com título e navegação de 4 abas (Programação / Salvas / Agenda / Mapa).
+2. `site/index.html`: mobile-first, CSS embutido (ou `site/style.css`). Header com título e navegação de abas (hoje 3: Programação / Agenda / Mapa — a Salvas saiu em 2026-08-03).
 3. `site/app.js`: carregar `data.json` via `fetch`. Funções de estado: `getState()`, `toggleSalva(id)`, `toggleAgenda(id)` (aplicando as regras do modelo acima), `isSalva(id)`, `naAgenda(id)`, persistindo em `localStorage["riw_state"]`.
 4. Roteamento simples entre abas (mostrar/esconder seções; pode usar hash `#programacao` etc.).
 
@@ -177,16 +181,24 @@ Próximos passos:
 3. Cada card com 2 botões: **Salvar** (toggle) e **+ Agenda** (toggle). Estado visual refletindo salva/agenda.
 4. Performance: são 1401 itens — renderizar só o subconjunto filtrado; evitar re-render pesado a cada tecla (debounce na busca).
 
-## Seção 3 — Aba Salvas (decidir)
-**Status: ✅ Feita.** Timeline por dia, conflitos marcados em âmbar com os títulos das concorrentes,
-+/− Agenda e Remover das salvas, contagem "N salvas · M na agenda", estado vazio.
-`window.RIW.acharConflitos(lista) → { id: [ids que colidem] }` é a função pura reusada pela Agenda.
-Objetivo: ver as salvas em timeline por dia pra escolher o que vira agenda.
-Próximos passos:
-1. Timeline por dia, ordenada por horário, só itens salvos.
-2. **Marcar conflitos** de horário visualmente (itens que se sobrepõem no mesmo dia).
-3. Por item: **+ Agenda / − Agenda** e **Remover das salvas**.
-4. (Bom ter) a partir de um horário, deixar claro quais salvas competem no mesmo slot.
+## Seção 3 — ~~Aba Salvas~~ → filtro "Tenho interesse" na Programação
+**Status: ✅ Feita — depois REMOVIDA e substituída pelo filtro (2026-08-03, pedido da Carla).**
+A aba dedicada saiu do app. As salvas agora são um **chip toggle "Tenho interesse"** na barra de
+filtros da Programação, que **compõe** com dia/trilha/prédio/tipo/busca, entra em
+`filtrosEstaoAtivos()` e é zerado por "Limpar filtros". Decisões travadas com a Carla:
+- **Sem marcação de conflito na Programação** — conflito é assunto só da Agenda (o grid já mostra a
+  sobreposição e o modal lista "Outros interesses nesse horário"). Ela abriu mão da triagem por
+  timeline de propósito; a lista filtrada é plana, agrupada por dia, com a paginação de 80.
+- **Chip toggle simples**, não segmentado — não existe visão "Na agenda" na Programação.
+- Cada card mantém **os dois** botões ("Tenho interesse" e "+ Agenda") em qualquer estado do filtro.
+- **Estado vazio próprio** quando o filtro está ligado e nada foi marcado (diferente do "Nenhuma
+  palestra encontrada com esses filtros" dos demais filtros).
+- Com o filtro ligado, desmarcar interesse **remove o card da lista na hora** (re-render + contagem).
+- `#salvas` (link antigo / aba restaurada pelo navegador) **redireciona pra `#programacao`**.
+- `window.RIW.acharConflitos(lista) → { id: [ids que colidem] }` continua **exposta** (função pura,
+  sem chamador interno hoje) — a Agenda pode reusar.
+- `filtrarPalestras` segue **pura**: recebe `{ interesse: true, idsInteresse: [...] }`, quem chama
+  resolve os ids a partir de `getState().salvas`. Chamadas antigas sem esses campos não mudam.
 
 ## Seção 4 — Aba Agenda (executar no dia)
 **Status: ✅ Feita — redesenhada em grid (2026-08-03, pedido da Carla).**

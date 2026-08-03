@@ -239,8 +239,12 @@
   }
 
   // filtrarPalestras(lista, filtros) — pura, sem tocar no DOM.
-  // filtros: { dia, trilha, predio, tipo, busca }, todos opcionais
-  // ('todos'/'todas' ou vazio = sem restrição nesse campo).
+  // filtros: { dia, trilha, predio, tipo, busca, interesse, idsInteresse },
+  // todos opcionais ('todos'/'todas' ou vazio = sem restrição nesse campo).
+  // `interesse: true` restringe às palestras com id presente em
+  // `idsInteresse` (array/objeto de ids) — quem chama resolve essa lista
+  // (ex.: getState().salvas), a função em si não lê estado nenhum, então
+  // continua pura e testável sem localStorage/DOM.
   function filtrarPalestras(lista, filtros) {
     filtros = filtros || {};
     var dia = filtros.dia || 'todos';
@@ -248,12 +252,19 @@
     var predio = filtros.predio || 'todos';
     var tipo = filtros.tipo || 'todos';
     var buscaNorm = normalizarTexto(filtros.busca || '');
+    var interesse = filtros.interesse === true;
+    var conjuntoInteresse = null;
+    if (interesse) {
+      conjuntoInteresse = {};
+      (filtros.idsInteresse || []).forEach(function (id) { conjuntoInteresse[id] = true; });
+    }
 
     var resultado = (lista || []).filter(function (p) {
       if (dia !== 'todos' && p.dia !== dia) return false;
       if (trilha !== 'todas' && normalizarTrilha(p.trilha) !== trilha) return false;
       if (predio !== 'todos' && p.predio_base !== predio) return false;
       if (tipo !== 'todos' && p.tipo !== tipo) return false;
+      if (interesse && !conjuntoInteresse[p.id]) return false;
 
       if (buscaNorm) {
         var achou = normalizarTexto(p.titulo).indexOf(buscaNorm) !== -1;
@@ -322,14 +333,15 @@
   var TAMANHO_PAGINA = 80;
   var programacaoInicializada = false;
   var qtdVisivel = TAMANHO_PAGINA;
-  var filtroEstado = { dia: 'todos', trilha: 'todas', predio: 'todos', tipo: 'todos', busca: '' };
+  var filtroEstado = { dia: 'todos', trilha: 'todas', predio: 'todos', tipo: 'todos', busca: '', interesse: false };
 
   function filtrosEstaoAtivos() {
     return filtroEstado.dia !== 'todos' ||
       filtroEstado.trilha !== 'todas' ||
       filtroEstado.predio !== 'todos' ||
       filtroEstado.tipo !== 'todos' ||
-      filtroEstado.busca !== '';
+      filtroEstado.busca !== '' ||
+      filtroEstado.interesse === true;
   }
 
   function construirHtmlFiltros() {
@@ -348,6 +360,13 @@
       html += '<button type="button" class="chip" data-dia="' + d + '" aria-pressed="false">' +
         partes[2] + '/' + partes[1] + '</button>';
     });
+    html += '</div>';
+
+    // chip toggle "Tenho interesse" — filtra às palestras marcadas via
+    // toggleSalva/isSalva; compõe com os outros filtros (não substitui).
+    html += '<div class="filtros__interesse-linha">';
+    html += '<button type="button" class="chip chip--interesse" id="filtro-interesse" ' +
+      'aria-pressed="false">Tenho interesse</button>';
     html += '</div>';
 
     function opcoesSelect(valores) {
@@ -400,7 +419,7 @@
   }
 
   function limparFiltros(container) {
-    filtroEstado = { dia: 'todos', trilha: 'todas', predio: 'todos', tipo: 'todos', busca: '' };
+    filtroEstado = { dia: 'todos', trilha: 'todas', predio: 'todos', tipo: 'todos', busca: '', interesse: false };
 
     var chipTodos = container.querySelector('.chip[data-dia="todos"]');
     if (chipTodos) marcarChipAtivo(container, chipTodos);
@@ -413,6 +432,12 @@
     if (selPredio) selPredio.value = 'todos';
     if (selTipo) selTipo.value = 'todos';
     if (busca) busca.value = '';
+
+    var elInteresse = container.querySelector('#filtro-interesse');
+    if (elInteresse) {
+      elInteresse.classList.remove('chip--ativo');
+      elInteresse.setAttribute('aria-pressed', 'false');
+    }
 
     aoMudarFiltro(container);
   }
@@ -456,6 +481,16 @@
     if (elLimpar) {
       elLimpar.addEventListener('click', function () { limparFiltros(container); });
     }
+
+    var elInteresse = container.querySelector('#filtro-interesse');
+    if (elInteresse) {
+      elInteresse.addEventListener('click', function () {
+        filtroEstado.interesse = !filtroEstado.interesse;
+        elInteresse.classList.toggle('chip--ativo', filtroEstado.interesse);
+        elInteresse.setAttribute('aria-pressed', String(filtroEstado.interesse));
+        aoMudarFiltro(container);
+      });
+    }
   }
 
   // -----------------------------------------------------------
@@ -487,7 +522,7 @@
     html += '<div class="card__acoes">';
     html += '<button type="button" class="botao ' + (salva ? 'botao--ativo' : 'botao--secundario') +
       '" data-acao="salvar" data-id="' + p.id + '" aria-pressed="' + salva + '">' +
-      (salva ? '✓ Salva' : 'Salvar') + '</button>';
+      (salva ? '✓ Tenho interesse' : 'Tenho interesse') + '</button>';
     html += '<button type="button" class="botao ' + (agendada ? 'botao--ativo' : 'botao--secundario') +
       '" data-acao="agenda" data-id="' + p.id + '" aria-pressed="' + agendada + '">' +
       (agendada ? '✓ Na agenda' : '+ Agenda') + '</button>';
@@ -522,7 +557,7 @@
     if (btnSalvar) {
       btnSalvar.className = 'botao ' + (salva ? 'botao--ativo' : 'botao--secundario');
       btnSalvar.setAttribute('aria-pressed', String(salva));
-      btnSalvar.textContent = salva ? '✓ Salva' : 'Salvar';
+      btnSalvar.textContent = salva ? '✓ Tenho interesse' : 'Tenho interesse';
     }
     var btnAgenda = card.querySelector('[data-acao="agenda"]');
     if (btnAgenda) {
@@ -540,7 +575,14 @@
     var acao = botao.getAttribute('data-acao');
     if (acao === 'salvar') toggleSalva(id);
     else if (acao === 'agenda') toggleAgenda(id);
-    atualizarBotoesCard(id); // regra: +Agenda também marca Salva, refletir os dois botões
+
+    // com o chip "Tenho interesse" ligado, marcar/desmarcar interesse muda
+    // quem aparece na lista (e a contagem) — precisa re-renderizar tudo.
+    if (filtroEstado.interesse) {
+      renderizarListaResultados();
+    } else {
+      atualizarBotoesCard(id); // regra: +Agenda também marca Salva, refletir os dois botões
+    }
   }
 
   function renderizarListaResultados() {
@@ -548,14 +590,29 @@
     var elContagem = document.getElementById('filtro-contagem');
     if (!elLista) return;
 
-    var resultado = filtrarPalestras(PALESTRAS, filtroEstado);
+    var idsInteresse = getState().salvas;
+    var filtros = {
+      dia: filtroEstado.dia,
+      trilha: filtroEstado.trilha,
+      predio: filtroEstado.predio,
+      tipo: filtroEstado.tipo,
+      busca: filtroEstado.busca,
+      interesse: filtroEstado.interesse,
+      idsInteresse: idsInteresse
+    };
+    var resultado = filtrarPalestras(PALESTRAS, filtros);
 
     if (elContagem) {
       elContagem.textContent = resultado.length + (resultado.length === 1 ? ' palestra' : ' palestras');
     }
 
     if (resultado.length === 0) {
-      elLista.innerHTML = '<p class="lista__vazio">Nenhuma palestra encontrada com esses filtros.</p>';
+      if (filtroEstado.interesse && idsInteresse.length === 0) {
+        elLista.innerHTML = '<p class="lista__vazio">Você ainda não marcou nenhuma palestra como ' +
+          '"Tenho interesse". Navegue na programação e toque em "Tenho interesse" nos cards.</p>';
+      } else {
+        elLista.innerHTML = '<p class="lista__vazio">Nenhuma palestra encontrada com esses filtros.</p>';
+      }
       return;
     }
 
@@ -580,7 +637,9 @@
   }
 
   // -----------------------------------------------------------
-  // Seção 3 — Aba Salvas: timeline + conflitos de horário
+  // Helpers de dia/horário reusados pela Agenda (a aba Salvas que os
+  // introduziu na Seção 3 saiu do app em 2026-08-03 — virou o filtro
+  // "Tenho interesse" da Programação).
   // -----------------------------------------------------------
 
   // compararDiaHorario(a, b) — ordena por dia e depois por início.
@@ -594,8 +653,9 @@
   // (cada uma com id, dia, inicio, fim) e devolve um objeto
   // { id: [ids que colidem com ele] }. Regra do PLANO.md: duas palestras
   // do MESMO dia colidem se inicio1 < fim2 && inicio2 < fim1 (encostadas
-  // não colidem). Não lê estado nenhum — recebe a lista pronta, pra
-  // poder ser reusada pela Agenda (Seção 4) com outra lista de entrada.
+  // não colidem). Não lê estado nenhum — recebe a lista pronta. Mantida e
+  // exposta em window.RIW mesmo sem chamador interno no momento (a Agenda
+  // pode reusá-la), por pedido explícito da Carla.
   function acharConflitos(lista) {
     var itens = lista || [];
     var resultado = {};
@@ -616,186 +676,10 @@
     return resultado;
   }
 
-  // truncarTexto(s, n) — corta título comprido pro rótulo de conflito.
-  function truncarTexto(s, n) {
-    s = String(s || '');
-    return s.length > n ? s.slice(0, n - 1) + '…' : s;
-  }
-
-  // resumoConflitantes(ids, mapaPorId) — "Título A; Título B e mais N",
-  // é o jeito simples de deixar claro QUEM compete no mesmo horário
-  // (passo 4, "bom ter", do PLANO.md) sem inventar UI nova.
-  var TITULOS_CONFLITO_MAX = 2;
-  function resumoConflitantes(ids, mapaPorId) {
-    var titulos = [];
-    for (var i = 0; i < ids.length && titulos.length < TITULOS_CONFLITO_MAX; i++) {
-      var pal = mapaPorId[ids[i]];
-      if (pal) titulos.push(truncarTexto(pal.titulo, 28));
-    }
-    var resto = ids.length - titulos.length;
-    var texto = titulos.join('; ');
-    if (resto > 0) texto += (texto ? ' e mais ' : 'mais ') + resto;
-    return texto;
-  }
-
-  // card da Salvas: mesma estrutura visual do card da Programação, mas
-  // com ações diferentes (+Agenda/−Agenda + Remover das salvas) e
-  // marca de conflito/"na agenda".
-  function construirHtmlCardSalva(p, conflitantes, mapaPorId) {
-    var cor = corDaTrilha(p.trilha);
-    var agendada = naAgenda(p.id);
-    var temConflito = conflitantes && conflitantes.length > 0;
-
-    var local = p.predio || '';
-    if (p.palco) local += ' — ' + p.palco;
-
-    var nomes = '';
-    if (Array.isArray(p.palestrantes) && p.palestrantes.length) {
-      nomes = p.palestrantes.map(function (pal) { return pal && pal.nome; })
-        .filter(Boolean).join(', ');
-    }
-
-    var classes = 'card';
-    // conflito é o alerta mais urgente (âmbar); "na agenda" só marca a
-    // borda quando não há conflito — o rótulo "● Na agenda" aparece
-    // sempre, independente da borda.
-    if (temConflito) classes += ' card--conflito';
-    else if (agendada) classes += ' card--na-agenda';
-
-    var html = '<article class="' + classes + '" data-card-id="' + p.id + '">';
-    html += '<span class="card__badge-trilha" style="background:' + cor + '">' +
-      escaparHtml(normalizarTrilha(p.trilha)) + '</span>';
-    html += '<div class="card__horario">' + escaparHtml(p.inicio) + '–' + escaparHtml(p.fim) +
-      ' <span class="card__tag-agenda"' + (agendada ? '' : ' hidden') + '>● Na agenda</span></div>';
-    html += '<h4 class="card__titulo">' + escaparHtml(p.titulo) + '</h4>';
-    html += '<div class="card__local">' + escaparHtml(local) + '</div>';
-    if (nomes) {
-      html += '<div class="card__palestrantes">' + escaparHtml(nomes) + '</div>';
-    }
-    if (temConflito) {
-      html += '<div class="card__conflito">⚠ Conflito com ' + conflitantes.length +
-        (conflitantes.length === 1 ? ' outra: ' : ' outras: ') +
-        escaparHtml(resumoConflitantes(conflitantes, mapaPorId)) + '</div>';
-    }
-    html += '<div class="card__acoes">';
-    html += '<button type="button" class="botao ' + (agendada ? 'botao--ativo' : 'botao--secundario') +
-      '" data-acao="agenda" data-id="' + p.id + '" aria-pressed="' + agendada + '">' +
-      (agendada ? '− Agenda' : '+ Agenda') + '</button>';
-    html += '<button type="button" class="botao botao--secundario" data-acao="remover" data-id="' + p.id + '">' +
-      'Remover das salvas</button>';
-    html += '</div>';
-    html += '</article>';
-    return html;
-  }
-
-  // agrupa por dia (a lista já vem ordenada por dia/inicio)
-  function construirHtmlListaSalvas(itens, conflitos, mapaPorId) {
-    var partes = [];
-    var diaAtual = null;
-    for (var i = 0; i < itens.length; i++) {
-      var p = itens[i];
-      if (p.dia !== diaAtual) {
-        diaAtual = p.dia;
-        partes.push('<h3 class="lista__cabecalho-dia">' + escaparHtml(formatarCabecalhoDia(p.dia)) + '</h3>');
-      }
-      partes.push(construirHtmlCardSalva(p, conflitos[p.id] || [], mapaPorId));
-    }
-    return partes.join('');
-  }
-
-  // atualiza só a contagem do topo ("N salvas · M na agenda"), sem
-  // re-renderizar a timeline inteira.
-  function atualizarContagemSalvas() {
-    var el = document.querySelector('#salvas-conteudo .filtros__contagem');
-    if (!el) return;
-    var estado = getState();
-    var lista = estado.salvas.map(getPalestraPorId).filter(Boolean);
-    var qtdAgenda = lista.filter(function (p) { return naAgenda(p.id); }).length;
-    el.textContent = lista.length + (lista.length === 1 ? ' salva' : ' salvas') +
-      ' · ' + qtdAgenda + ' na agenda';
-  }
-
-  // atualiza só o card afetado (+Agenda/−Agenda não muda o tamanho da
-  // lista nem os conflitos dos vizinhos, então não precisa re-renderizar
-  // tudo — só remover das salvas precisa, ver aoClicarSalvas).
-  function atualizarCardSalva(id) {
-    var card = document.querySelector('#salvas-conteudo .card[data-card-id="' + id + '"]');
-    if (!card) return;
-    var agendada = naAgenda(id);
-
-    var btn = card.querySelector('[data-acao="agenda"]');
-    if (btn) {
-      btn.className = 'botao ' + (agendada ? 'botao--ativo' : 'botao--secundario');
-      btn.setAttribute('aria-pressed', String(agendada));
-      btn.textContent = agendada ? '− Agenda' : '+ Agenda';
-    }
-
-    var tag = card.querySelector('.card__tag-agenda');
-    if (tag) tag.hidden = !agendada;
-
-    // a borda de conflito (âmbar) tem prioridade visual; só alterna a
-    // borda "na agenda" quando o card não estiver marcado em conflito
-    if (!card.classList.contains('card--conflito')) {
-      card.classList.toggle('card--na-agenda', agendada);
-    }
-
-    atualizarContagemSalvas();
-  }
-
-  // delegação de eventos: um único listener no container da timeline
-  function aoClicarSalvas(evento) {
-    var botao = evento.target.closest('button[data-acao]');
-    if (!botao) return;
-    var id = Number(botao.getAttribute('data-id'));
-    var acao = botao.getAttribute('data-acao');
-
-    if (acao === 'agenda') {
-      toggleAgenda(id);
-      atualizarCardSalva(id);
-    } else if (acao === 'remover') {
-      toggleSalva(id);
-      // sai da lista → re-renderiza a timeline inteira (recalcula
-      // conflitos dos vizinhos, que mudam quando este item some)
-      renderizarListaSalvas();
-    }
-  }
-
-  var salvasInicializada = false;
-
-  // renderizarListaSalvas() — sempre relê o estado do zero (sem cache),
-  // pra ficar em sincronia com o que foi feito na aba Programação.
-  function renderizarListaSalvas() {
-    var elConteudo = document.getElementById('salvas-conteudo');
-    if (!elConteudo) return;
-
-    var estado = getState();
-    var listaSalvas = estado.salvas.map(getPalestraPorId).filter(Boolean);
-    listaSalvas.sort(compararDiaHorario);
-
-    if (listaSalvas.length === 0) {
-      elConteudo.innerHTML = '<p class="lista__vazio">Nenhuma palestra salva ainda. ' +
-        'Salve palestras na aba Programação pra triar aqui.</p>';
-      return;
-    }
-
-    var mapaPorId = {};
-    listaSalvas.forEach(function (p) { mapaPorId[p.id] = p; });
-
-    var conflitos = acharConflitos(listaSalvas);
-    var qtdAgenda = listaSalvas.filter(function (p) { return naAgenda(p.id); }).length;
-
-    var html = '<p class="filtros__contagem">' + listaSalvas.length +
-      (listaSalvas.length === 1 ? ' salva' : ' salvas') +
-      ' · ' + qtdAgenda + ' na agenda</p>';
-    html += construirHtmlListaSalvas(listaSalvas, conflitos, mapaPorId);
-
-    elConteudo.innerHTML = html;
-  }
-
   // -----------------------------------------------------------
-  // Seção 4 — Aba Agenda: timeline enxuta + conflito (vermelho,
-  // mais grave que o âmbar da Salvas) + alerta de distância entre
-  // itens consecutivos (usa a matriz da Seção 5, distancias.json).
+  // Seção 4 — Aba Agenda: timeline enxuta + conflito (vermelho) +
+  // alerta de distância entre itens consecutivos (usa a matriz da
+  // Seção 5, distancias.json).
   // -----------------------------------------------------------
 
   // minutosDoHorario("HH:MM") → inteiro de minutos desde 00:00.
@@ -1226,7 +1110,7 @@
 
     var html = construirHtmlCabecalhoAgenda(dias, agendaDiaSelecionado, itensDoDia.length);
     if (!itensDoDia.length) {
-      html += '<p class="lista__vazio">Nada na agenda nesse dia. Adicione a partir das Salvas ou da Programação.</p>';
+      html += '<p class="lista__vazio">Nada na agenda nesse dia. Adicione a partir da Programação.</p>';
     } else {
       html += construirHtmlGradeAgenda(itensDoDia);
     }
@@ -1312,7 +1196,7 @@
 
     var candidatas = candidatasMesmoHorario(p, todasSalvas);
     html += '<div class="modal__outras">';
-    html += '<h4 class="modal__outras-titulo">Outras salvas nesse horário</h4>';
+    html += '<h4 class="modal__outras-titulo">Outros interesses nesse horário</h4>';
     if (candidatas.length) {
       html += '<div class="agenda-item__outras-lista">';
       candidatas.forEach(function (c) {
@@ -1329,7 +1213,7 @@
       });
       html += '</div>';
     } else {
-      html += '<p class="modal__outras-vazio">Nenhuma outra salva nesse horário.</p>';
+      html += '<p class="modal__outras-vazio">Nenhum outro interesse nesse horário.</p>';
     }
     html += '</div>';
 
@@ -1437,9 +1321,9 @@
   var agendaInicializada = false;
 
   // -----------------------------------------------------------
-  // Roteamento por hash (#programacao, #salvas, #agenda, #mapa)
+  // Roteamento por hash (#programacao, #agenda, #mapa)
   // -----------------------------------------------------------
-  var ABAS_VALIDAS = ['programacao', 'salvas', 'agenda', 'mapa'];
+  var ABAS_VALIDAS = ['programacao', 'agenda', 'mapa'];
   var ABA_PADRAO = 'programacao';
 
   function renderProgramacao() {
@@ -1462,26 +1346,6 @@
     }
 
     renderizarListaResultados();
-  }
-
-  function renderSalvas() {
-    var elConteudo = document.getElementById('salvas-conteudo');
-    if (!elConteudo) return;
-
-    if (!DADOS_CARREGADOS) {
-      elConteudo.innerHTML = '<p class="carregando">Carregando palestras…</p>';
-      return;
-    }
-
-    // listener de delegação ligado só uma vez no container (o container
-    // em si nunca é substituído, só o innerHTML dele)
-    if (!salvasInicializada) {
-      elConteudo.addEventListener('click', aoClicarSalvas);
-      salvasInicializada = true;
-    }
-
-    // relê o estado do zero sempre que a aba abre — nada de cache
-    renderizarListaSalvas();
   }
 
   function renderAgenda() {
@@ -1597,7 +1461,6 @@
 
   var RENDERERS = {
     programacao: renderProgramacao,
-    salvas: renderSalvas,
     agenda: renderAgenda,
     mapa: renderMapa
   };
@@ -1628,6 +1491,14 @@
   }
 
   function rotear() {
+    // link antigo/aba restaurada pelo navegador em #salvas (a aba Salvas
+    // saiu do app em 2026-08-03, virou o filtro "Tenho interesse" da
+    // Programação) — redireciona em vez de deixar tela em branco.
+    var hash = (window.location.hash || '').replace('#', '');
+    if (hash === 'salvas') {
+      window.location.hash = ABA_PADRAO;
+      return; // o hashchange que acabou de disparar chama rotear() de novo
+    }
     mostrarAba(abaAtual());
   }
 
@@ -1694,7 +1565,7 @@
     escaparHtml: escaparHtml,
     normalizarTexto: normalizarTexto,
     filtrarPalestras: filtrarPalestras,
-    // Seção 3 — regra de conflito, genérica (a Seção 4/Agenda reusa)
+    // regra de conflito, genérica — mantida pra Agenda reusar
     acharConflitos: acharConflitos,
     // Seção 4 — distância entre itens consecutivos da Agenda
     minutosDoHorario: minutosDoHorario,

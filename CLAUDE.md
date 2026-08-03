@@ -12,9 +12,10 @@ produto já estão travadas lá — não redecida, execute.
 - **Stack:** site **estático, sem build** (HTML + JS puro + JSON embutido). Código no **GitHub** e
   deploy contínuo no **Netlify** (publish dir = `site/`, sem build command) — ver Seção 0B do `PLANO.md`.
   Sem login; estado no `localStorage`. Regra geral: **simples, sem overengineering.**
-- **4 abas:** Programação · Salvas · Agenda · Mapa.
-- **Modelo de 2 estados por palestra:** *Salvar* (triagem) e *Adicionar à agenda* (plano). Agenda ⊆ Salvas;
-  remover da agenda MANTÉM salva (banco de reserva pra fila lotada). Detalhes no `PLANO.md`.
+- **3 abas:** Programação · Agenda · Mapa. As "salvas" são um **filtro** na Programação, chamado **"Tenho interesse"** na UI (a aba dedicada saiu em 2026-08-03).
+- **Modelo de 2 estados por palestra:** *Tenho interesse* (triagem) e *Adicionar à agenda* (plano).
+  Agenda ⊆ interesses; remover da agenda MANTÉM o interesse (banco de reserva pra fila lotada).
+  No código o estado ainda se chama `salvas` — só o texto da UI mudou. Detalhes no `PLANO.md`.
 
 ## Arquivos de dados (raiz)
 - `palestras.json` — 1401 palestras achatadas (fonte do app). Snapshot da API em 2026-08-02.
