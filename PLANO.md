@@ -203,7 +203,8 @@ Próximos passos:
 2. (Bom ter) legenda curta ligando os 7 nós da matriz de distância aos rótulos do mapa (ex: "NAM Atlântico" = o navio; "Kobra" = Galpão Kobra à direita).
 
 ## Seção 5 — Inteligência de distância entre prédios
-**Status: ✅ Matriz pronta e calibrada.** Falta só ligar na aba Agenda (Seção 4).
+**Status: ✅ Feita.** Matriz calibrada **e já ligada** na Agenda (`avaliarTrecho`, Seção 4) — os
+textos e níveis finais estão na tabela da Seção 4, que manda sobre o item 2 do "como usar" abaixo.
 A matriz de tempo de caminhada entre os 7 nós está em **`distancias.json`** (na raiz).
 - **Valores finais já incluem tudo:** lotação (2x) + buffer de saída de palco (+2 min) + piso mínimo de 5 min. Fórmula aplicada: `tempo = max(5, base_com_lotação + 2)`.
 - **Calibração:** âncora real da Carla — Armazém 2→5 = 5 min no Google → 10 min com lotação; depois +2/piso 5 → **12 min** (valor final na matriz). Armazéns 1–5 em fila, espaçamento uniforme. Kobra e NAM Atlântico estimados pela posição relativa na planta oficial (Kobra recuado atrás do Armazém 4-5; NAM Atlântico atracado na frente do Armazém 2-3).
@@ -238,3 +239,17 @@ Próximos passos:
 - [x] ~~Mapa oficial do evento (distâncias)~~ — recebido; matriz calibrada (Seção 5 / `distancias.json`).
 - [x] ~~Arquivo da imagem da planta~~ — salvo em `site/assets/mapa-evento.webp` (Seção 4B).
 - [ ] Project API key do PostHog (Seção 6).
+- [ ] Conectar o repo no painel do Netlify (Seção 7) — só ela tem acesso.
+- [ ] Confirmar que abre o repo no claude.ai/code pelo celular (Seção 0B, passo 7).
+- [ ] **Decidir:** exportar/importar agenda (colar um texto pra levar de um aparelho pro outro).
+  Ideia levantada em 2026-08-03, **não aprovada** — não implementar sem ela pedir.
+
+## Persistência do estado — o que a Carla precisa saber
+O `localStorage` é por **origem** (domínio+porta) e **sobrevive a deploy**: publicar versão nova não
+apaga a agenda. Mas ela se perde ao trocar de origem (`localhost:8080` → `*.netlify.app` → domínio
+próprio), de navegador ou de aparelho. Por isso: **montar a agenda de verdade só depois do deploy**,
+já no endereço final.
+⚠️ **No refresh da programação na véspera:** gravamos o **id da própria API**. Se um id mudar, a
+palestra some da agenda **em silêncio** (o app descarta id desconhecido sem avisar, mas **não apaga**
+do storage — se voltar, reaparece). Ao regerar `palestras.json`, **diffar os ids antigos × novos e
+reportar o que sumiu** antes de publicar.
