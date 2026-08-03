@@ -218,6 +218,8 @@ body {
   font-weight: 600;
   color: var(--texto-primario);
   margin: 4px 0;
+  /* títulos vêm da API e podem ter palavra/URL comprida: quebra em vez de estourar */
+  overflow-wrap: anywhere;
 }
 
 .card__local {
@@ -260,4 +262,151 @@ body {
 .botao--ativo {
   background: var(--sucesso);
   color: #FFFFFF;
+}
+
+.botao--carregar-mais {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* ---------- barra de filtros (Seção 2 — Programação) ---------- */
+/* fica no fluxo normal do documento (não fixa/flutuante), então
+   nunca cobre o conteúdo — só empurra a lista pra baixo. */
+.filtros {
+  background: var(--superficie-card);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-card);
+  padding: 10px 12px 12px;
+  margin-bottom: 12px;
+}
+
+.filtros__contagem {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--texto-secundario);
+}
+
+.filtros__dias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.chip {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--borda-forte);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--texto-secundario);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chip--ativo {
+  background: var(--cor-acao);
+  border-color: var(--cor-acao);
+  color: var(--texto-sobre-acao);
+}
+
+.filtros__linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.filtros__label {
+  flex: 1 1 120px;
+  /* min-width:0 é essencial: sem isso o <select> não encolhe abaixo do
+     min-content da opção mais longa e a página rola na horizontal no celular */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--texto-terciario);
+}
+
+.filtros__select,
+.filtros__busca {
+  min-height: 40px;
+  min-width: 0;
+  width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--raio);
+  background: var(--superficie-funda);
+  color: var(--texto-primario);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.filtros__select:focus,
+.filtros__busca:focus {
+  outline: 2px solid var(--cor-acao);
+  outline-offset: 1px;
+}
+
+.filtros__busca-linha {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.filtros__label--busca {
+  flex: 1 1 auto;
+}
+
+.filtros__limpar {
+  min-height: 40px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--cor-acao);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ---------- lista de resultados agrupada por dia ---------- */
+.lista__cabecalho-dia {
+  margin: 16px 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--texto-secundario);
+}
+
+.lista__cabecalho-dia:first-child {
+  margin-top: 0;
+}
+
+.lista__vazio {
+  background: var(--superficie-card);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-card);
+  padding: 16px;
+  color: var(--texto-secundario);
+  font-size: 14px;
+  text-align: center;
+}
+
+.card__palestrantes {
+  font-size: 13px;
+  color: var(--texto-secundario);
+  margin-top: 2px;
 }

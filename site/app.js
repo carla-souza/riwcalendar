@@ -185,23 +185,395 @@
   }
 
   // -----------------------------------------------------------
+  // Seção 2 — Aba Programação: escape, normalização e filtro
+  // (funções puras, testáveis fora do navegador)
+  // -----------------------------------------------------------
+
+  // escaparHtml(s) — nunca deixar título/nome/empresa vindos da API
+  // irem crus pro innerHTML.
+  var MAPA_ESCAPE = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  function escaparHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return MAPA_ESCAPE[c];
+    });
+  }
+
+  // normalizarTexto(s) — minúsculo + sem acento, pra busca "inteligencia"
+  // casar com "Inteligência".
+  function normalizarTexto(s) {
+    return String(s || '')
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase();
+  }
+
+  // filtrarPalestras(lista, filtros) — pura, sem tocar no DOM.
+  // filtros: { dia, trilha, predio, tipo, busca }, todos opcionais
+  // ('todos'/'todas' ou vazio = sem restrição nesse campo).
+  function filtrarPalestras(lista, filtros) {
+    filtros = filtros || {};
+    var dia = filtros.dia || 'todos';
+    var trilha = filtros.trilha || 'todas';
+    var predio = filtros.predio || 'todos';
+    var tipo = filtros.tipo || 'todos';
+    var buscaNorm = normalizarTexto(filtros.busca || '');
+
+    var resultado = (lista || []).filter(function (p) {
+      if (dia !== 'todos' && p.dia !== dia) return false;
+      if (trilha !== 'todas' && normalizarTrilha(p.trilha) !== trilha) return false;
+      if (predio !== 'todos' && p.predio_base !== predio) return false;
+      if (tipo !== 'todos' && p.tipo !== tipo) return false;
+
+      if (buscaNorm) {
+        var achou = normalizarTexto(p.titulo).indexOf(buscaNorm) !== -1;
+        if (!achou && Array.isArray(p.palestrantes)) {
+          for (var i = 0; i < p.palestrantes.length && !achou; i++) {
+            var pal = p.palestrantes[i] || {};
+            if (normalizarTexto(pal.nome).indexOf(buscaNorm) !== -1) achou = true;
+            else if (normalizarTexto(pal.empresa).indexOf(buscaNorm) !== -1) achou = true;
+          }
+        }
+        if (!achou) return false;
+      }
+      return true;
+    });
+
+    resultado.sort(function (a, b) {
+      if (a.dia !== b.dia) return a.dia < b.dia ? -1 : 1;
+      if (a.inicio !== b.inicio) return a.inicio < b.inicio ? -1 : 1;
+      return 0;
+    });
+
+    return resultado;
+  }
+
+  // valores únicos de um campo, ordenados alfabeticamente (pt-BR)
+  function valoresUnicosOrdenados(lista, seletor) {
+    var vistos = {};
+    var saida = [];
+    for (var i = 0; i < lista.length; i++) {
+      var v = seletor(lista[i]);
+      if (v && !vistos[v]) {
+        vistos[v] = true;
+        saida.push(v);
+      }
+    }
+    saida.sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); });
+    return saida;
+  }
+
+  function diasUnicos(lista) {
+    var vistos = {};
+    var saida = [];
+    for (var i = 0; i < lista.length; i++) {
+      var d = lista[i].dia;
+      if (d && !vistos[d]) {
+        vistos[d] = true;
+        saida.push(d);
+      }
+    }
+    saida.sort();
+    return saida;
+  }
+
+  var DIAS_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+
+  // "2026-08-04" → "Terça, 04/08" (Date local, sem risco de fuso mudar o dia)
+  function formatarCabecalhoDia(diaIso) {
+    var partes = diaIso.split('-');
+    var d = new Date(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2]));
+    return DIAS_SEMANA[d.getDay()] + ', ' + partes[2] + '/' + partes[1];
+  }
+
+  // -----------------------------------------------------------
+  // Programação — estado dos filtros + paginação incremental
+  // -----------------------------------------------------------
+  var TAMANHO_PAGINA = 80;
+  var programacaoInicializada = false;
+  var qtdVisivel = TAMANHO_PAGINA;
+  var filtroEstado = { dia: 'todos', trilha: 'todas', predio: 'todos', tipo: 'todos', busca: '' };
+
+  function filtrosEstaoAtivos() {
+    return filtroEstado.dia !== 'todos' ||
+      filtroEstado.trilha !== 'todas' ||
+      filtroEstado.predio !== 'todos' ||
+      filtroEstado.tipo !== 'todos' ||
+      filtroEstado.busca !== '';
+  }
+
+  function construirHtmlFiltros() {
+    var dias = diasUnicos(PALESTRAS);
+    var trilhas = valoresUnicosOrdenados(PALESTRAS, function (p) { return normalizarTrilha(p.trilha); });
+    var predios = valoresUnicosOrdenados(PALESTRAS, function (p) { return p.predio_base; });
+    var tipos = valoresUnicosOrdenados(PALESTRAS, function (p) { return p.tipo; });
+
+    var html = '';
+    html += '<p class="filtros__contagem" id="filtro-contagem"></p>';
+
+    html += '<div class="filtros__dias" role="group" aria-label="Filtrar por dia">';
+    html += '<button type="button" class="chip chip--ativo" data-dia="todos" aria-pressed="true">Todos</button>';
+    dias.forEach(function (d) {
+      var partes = d.split('-');
+      html += '<button type="button" class="chip" data-dia="' + d + '" aria-pressed="false">' +
+        partes[2] + '/' + partes[1] + '</button>';
+    });
+    html += '</div>';
+
+    function opcoesSelect(valores) {
+      return valores.map(function (v) {
+        var esc = escaparHtml(v);
+        return '<option value="' + esc + '">' + esc + '</option>';
+      }).join('');
+    }
+
+    html += '<div class="filtros__linha">';
+    html += '<label class="filtros__label" for="filtro-trilha">Trilha' +
+      '<select id="filtro-trilha" class="filtros__select"><option value="todas">Todas</option>' +
+      opcoesSelect(trilhas) + '</select></label>';
+    html += '<label class="filtros__label" for="filtro-predio">Prédio' +
+      '<select id="filtro-predio" class="filtros__select"><option value="todos">Todos</option>' +
+      opcoesSelect(predios) + '</select></label>';
+    html += '<label class="filtros__label" for="filtro-tipo">Tipo' +
+      '<select id="filtro-tipo" class="filtros__select"><option value="todos">Todos</option>' +
+      opcoesSelect(tipos) + '</select></label>';
+    html += '</div>';
+
+    html += '<div class="filtros__busca-linha">';
+    html += '<label class="filtros__label filtros__label--busca" for="filtro-busca">Buscar' +
+      '<input type="search" id="filtro-busca" class="filtros__busca" ' +
+      'placeholder="Título, palestrante ou empresa…"></label>';
+    html += '<button type="button" id="filtro-limpar" class="filtros__limpar" hidden>Limpar filtros</button>';
+    html += '</div>';
+
+    return html;
+  }
+
+  function atualizarBotaoLimpar(container) {
+    var botao = container.querySelector('#filtro-limpar');
+    if (botao) botao.hidden = !filtrosEstaoAtivos();
+  }
+
+  function marcarChipAtivo(container, chipClicado) {
+    var chips = container.querySelectorAll('.chip');
+    chips.forEach(function (chip) {
+      var ativo = chip === chipClicado;
+      chip.classList.toggle('chip--ativo', ativo);
+      chip.setAttribute('aria-pressed', ativo ? 'true' : 'false');
+    });
+  }
+
+  function aoMudarFiltro(container) {
+    qtdVisivel = TAMANHO_PAGINA;
+    atualizarBotaoLimpar(container);
+    renderizarListaResultados();
+  }
+
+  function limparFiltros(container) {
+    filtroEstado = { dia: 'todos', trilha: 'todas', predio: 'todos', tipo: 'todos', busca: '' };
+
+    var chipTodos = container.querySelector('.chip[data-dia="todos"]');
+    if (chipTodos) marcarChipAtivo(container, chipTodos);
+
+    var selTrilha = container.querySelector('#filtro-trilha');
+    var selPredio = container.querySelector('#filtro-predio');
+    var selTipo = container.querySelector('#filtro-tipo');
+    var busca = container.querySelector('#filtro-busca');
+    if (selTrilha) selTrilha.value = 'todas';
+    if (selPredio) selPredio.value = 'todos';
+    if (selTipo) selTipo.value = 'todos';
+    if (busca) busca.value = '';
+
+    aoMudarFiltro(container);
+  }
+
+  function ligarEventosFiltros(container) {
+    var elDias = container.querySelector('.filtros__dias');
+    if (elDias) {
+      elDias.addEventListener('click', function (evento) {
+        var chip = evento.target.closest('.chip');
+        if (!chip) return;
+        filtroEstado.dia = chip.getAttribute('data-dia');
+        marcarChipAtivo(container, chip);
+        aoMudarFiltro(container);
+      });
+    }
+
+    ['trilha', 'predio', 'tipo'].forEach(function (campo) {
+      var el = container.querySelector('#filtro-' + campo);
+      if (!el) return;
+      el.addEventListener('change', function (evento) {
+        filtroEstado[campo] = evento.target.value;
+        aoMudarFiltro(container);
+      });
+    });
+
+    var elBusca = container.querySelector('#filtro-busca');
+    if (elBusca) {
+      var temporizador = null;
+      elBusca.addEventListener('input', function (evento) {
+        var valor = evento.target.value;
+        clearTimeout(temporizador);
+        // debounce ~200ms: evita filtrar/renderizar a cada tecla
+        temporizador = setTimeout(function () {
+          filtroEstado.busca = valor;
+          aoMudarFiltro(container);
+        }, 200);
+      });
+    }
+
+    var elLimpar = container.querySelector('#filtro-limpar');
+    if (elLimpar) {
+      elLimpar.addEventListener('click', function () { limparFiltros(container); });
+    }
+  }
+
+  // -----------------------------------------------------------
+  // Programação — lista de resultados (cards) + delegação
+  // -----------------------------------------------------------
+  function construirHtmlCard(p) {
+    var cor = corDaTrilha(p.trilha);
+    var salva = isSalva(p.id);
+    var agendada = naAgenda(p.id);
+
+    var local = p.predio || '';
+    if (p.palco) local += ' — ' + p.palco;
+
+    var nomes = '';
+    if (Array.isArray(p.palestrantes) && p.palestrantes.length) {
+      nomes = p.palestrantes.map(function (pal) { return pal && pal.nome; })
+        .filter(Boolean).join(', ');
+    }
+
+    var html = '<article class="card" data-card-id="' + p.id + '">';
+    html += '<span class="card__badge-trilha" style="background:' + cor + '">' +
+      escaparHtml(normalizarTrilha(p.trilha)) + '</span>';
+    html += '<div class="card__horario">' + escaparHtml(p.inicio) + '–' + escaparHtml(p.fim) + '</div>';
+    html += '<h4 class="card__titulo">' + escaparHtml(p.titulo) + '</h4>';
+    html += '<div class="card__local">' + escaparHtml(local) + '</div>';
+    if (nomes) {
+      html += '<div class="card__palestrantes">' + escaparHtml(nomes) + '</div>';
+    }
+    html += '<div class="card__acoes">';
+    html += '<button type="button" class="botao ' + (salva ? 'botao--ativo' : 'botao--secundario') +
+      '" data-acao="salvar" data-id="' + p.id + '" aria-pressed="' + salva + '">' +
+      (salva ? '✓ Salva' : 'Salvar') + '</button>';
+    html += '<button type="button" class="botao ' + (agendada ? 'botao--ativo' : 'botao--secundario') +
+      '" data-acao="agenda" data-id="' + p.id + '" aria-pressed="' + agendada + '">' +
+      (agendada ? '✓ Na agenda' : '+ Agenda') + '</button>';
+    html += '</div>';
+    html += '</article>';
+    return html;
+  }
+
+  // agrupa por dia (a lista já vem ordenada por dia/inicio)
+  function construirHtmlLista(itens) {
+    var partes = [];
+    var diaAtual = null;
+    for (var i = 0; i < itens.length; i++) {
+      var p = itens[i];
+      if (p.dia !== diaAtual) {
+        diaAtual = p.dia;
+        partes.push('<h3 class="lista__cabecalho-dia">' + escaparHtml(formatarCabecalhoDia(p.dia)) + '</h3>');
+      }
+      partes.push(construirHtmlCard(p));
+    }
+    return partes.join('');
+  }
+
+  // atualiza só os botões de UM card, sem re-renderizar a lista inteira
+  function atualizarBotoesCard(id) {
+    var card = document.querySelector('.card[data-card-id="' + id + '"]');
+    if (!card) return;
+    var salva = isSalva(id);
+    var agendada = naAgenda(id);
+
+    var btnSalvar = card.querySelector('[data-acao="salvar"]');
+    if (btnSalvar) {
+      btnSalvar.className = 'botao ' + (salva ? 'botao--ativo' : 'botao--secundario');
+      btnSalvar.setAttribute('aria-pressed', String(salva));
+      btnSalvar.textContent = salva ? '✓ Salva' : 'Salvar';
+    }
+    var btnAgenda = card.querySelector('[data-acao="agenda"]');
+    if (btnAgenda) {
+      btnAgenda.className = 'botao ' + (agendada ? 'botao--ativo' : 'botao--secundario');
+      btnAgenda.setAttribute('aria-pressed', String(agendada));
+      btnAgenda.textContent = agendada ? '✓ Na agenda' : '+ Agenda';
+    }
+  }
+
+  // delegação de eventos: um único listener no container da lista
+  function aoClicarLista(evento) {
+    var botao = evento.target.closest('button[data-acao]');
+    if (!botao) return;
+    var id = Number(botao.getAttribute('data-id'));
+    var acao = botao.getAttribute('data-acao');
+    if (acao === 'salvar') toggleSalva(id);
+    else if (acao === 'agenda') toggleAgenda(id);
+    atualizarBotoesCard(id); // regra: +Agenda também marca Salva, refletir os dois botões
+  }
+
+  function renderizarListaResultados() {
+    var elLista = document.getElementById('programacao-conteudo');
+    var elContagem = document.getElementById('filtro-contagem');
+    if (!elLista) return;
+
+    var resultado = filtrarPalestras(PALESTRAS, filtroEstado);
+
+    if (elContagem) {
+      elContagem.textContent = resultado.length + (resultado.length === 1 ? ' palestra' : ' palestras');
+    }
+
+    if (resultado.length === 0) {
+      elLista.innerHTML = '<p class="lista__vazio">Nenhuma palestra encontrada com esses filtros.</p>';
+      return;
+    }
+
+    var visiveis = resultado.slice(0, qtdVisivel);
+    var html = construirHtmlLista(visiveis);
+
+    if (resultado.length > visiveis.length) {
+      html += '<button type="button" id="botao-carregar-mais" class="botao botao--secundario botao--carregar-mais">' +
+        'Carregar mais (' + (resultado.length - visiveis.length) + ' restantes)</button>';
+    }
+
+    // um único innerHTML pra todo o lote — nada de appendChild item a item
+    elLista.innerHTML = html;
+
+    var botaoMais = document.getElementById('botao-carregar-mais');
+    if (botaoMais) {
+      botaoMais.addEventListener('click', function () {
+        qtdVisivel += TAMANHO_PAGINA;
+        renderizarListaResultados();
+      });
+    }
+  }
+
+  // -----------------------------------------------------------
   // Roteamento por hash (#programacao, #salvas, #agenda, #mapa)
   // -----------------------------------------------------------
   var ABAS_VALIDAS = ['programacao', 'salvas', 'agenda', 'mapa'];
   var ABA_PADRAO = 'programacao';
 
-  // Pontos de extensão pras próximas seções do plano preencherem.
   function renderProgramacao() {
-    var el = document.getElementById('programacao-conteudo');
-    if (!el) return;
+    var elFiltros = document.getElementById('programacao-filtros');
+    var elLista = document.getElementById('programacao-conteudo');
+    if (!elFiltros || !elLista) return;
+
     if (!DADOS_CARREGADOS) {
-      el.innerHTML = '<p class="carregando">Carregando palestras…</p>';
+      elLista.innerHTML = '<p class="carregando">Carregando palestras…</p>';
       return;
     }
-    el.innerHTML =
-      '<p class="placeholder">' +
-      PALESTRAS.length +
-      ' palestras carregadas. A lista com filtros e busca chega na próxima seção do plano.</p>';
+
+    // barra de filtros é construída e ligada só uma vez; cliques/troca de
+    // filtro depois disso só re-renderizam a lista de resultados.
+    if (!programacaoInicializada) {
+      elFiltros.innerHTML = construirHtmlFiltros();
+      ligarEventosFiltros(elFiltros);
+      elLista.addEventListener('click', aoClicarLista);
+      programacaoInicializada = true;
+    }
+
+    renderizarListaResultados();
   }
 
   function renderSalvas() {
@@ -310,6 +682,10 @@
     getPalestras: function () {
       return PALESTRAS;
     },
-    RENDERERS: RENDERERS
+    RENDERERS: RENDERERS,
+    // Seção 2 — expostas pra teste puro em Node (sem navegador)
+    escaparHtml: escaparHtml,
+    normalizarTexto: normalizarTexto,
+    filtrarPalestras: filtrarPalestras
   };
 })();

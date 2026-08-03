@@ -132,7 +132,9 @@ Próximos passos:
 4. Roteamento simples entre abas (mostrar/esconder seções; pode usar hash `#programacao` etc.).
 
 ## Seção 2 — Aba Programação (explorar + triar)
-**Status: ⬜ A fazer.**
+**Status: ✅ Feita.** Chips de dia + selects (trilha/prédio-base/tipo) + busca sem acento com
+debounce 200ms, contagem, "Limpar filtros"; lista agrupada por dia, paginação de 80 ("Carregar mais"),
+delegação de eventos, `escaparHtml` em tudo que vem da API. Testado em Chrome headless.
 Objetivo: navegar as 1401 palestras e salvar/agendar rápido.
 Próximos passos:
 1. Barra de filtros: chips de **dia** (Todos/04/05/06/07); selects de **trilha**, **prédio**, **tipo**; **busca** por texto (título + palestrante + empresa).
