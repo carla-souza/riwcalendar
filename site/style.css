@@ -551,16 +551,11 @@ body {
   margin-top: 6px;
 }
 
-/* recortada em 3 linhas pra não estourar a altura do card numa lista densa */
 .card__descricao {
   margin: 14px 0 0;
   font-size: 13px;
   color: var(--texto-secundario);
-  overflow: hidden;
   overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
 }
 
 /* ---------- aba Agenda (Seção 4) — trechos e selo de conflito (usados dentro do modal) ---------- */
