@@ -999,11 +999,30 @@
     return (n < 10 ? '0' : '') + n;
   }
 
-  // hojeIso() — data de hoje no formato YYYY-MM-DD (fuso local), pra
+  // agoraNoRio() — data/hora atual no fuso do evento (America/Sao_Paulo),
+  // não no fuso do dispositivo de quem acessa. O Brasil não observa
+  // horário de verão desde 2019, então isso é sempre UTC-3 — sem
+  // complicação de DST. Usado por hojeIso() e minutosAgora() pra que
+  // "hoje" e a linha de horário atual da Agenda batam com o horário
+  // real do Rio, mesmo se o navegador estiver em outro fuso.
+  function agoraNoRio() {
+    var partes = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(new Date());
+    var mapa = {};
+    partes.forEach(function (p) { mapa[p.type] = p.value; });
+    // alguns navegadores retornam "24" pra meia-noite com hour12:false
+    if (mapa.hour === '24') mapa.hour = '00';
+    return mapa;
+  }
+
+  // hojeIso() — data de hoje no formato YYYY-MM-DD, no fuso do Rio, pra
   // comparar com os dias do evento e escolher o dia padrão da Agenda.
   function hojeIso() {
-    var agora = new Date();
-    return agora.getFullYear() + '-' + doisDigitos(agora.getMonth() + 1) + '-' + doisDigitos(agora.getDate());
+    var agora = agoraNoRio();
+    return agora.year + '-' + agora.month + '-' + agora.day;
   }
 
   // diaPadraoAgenda(dias) — hoje, se for um dos dias do evento; senão
@@ -1013,11 +1032,11 @@
     return dias.indexOf(hoje) !== -1 ? hoje : dias[0];
   }
 
-  // minutosAgora() — minutos desde meia-noite, hora local, pra
+  // minutosAgora() — minutos desde meia-noite, hora do Rio, pra
   // posicionar a linha de "agora" no grid da Agenda.
   function minutosAgora() {
-    var agora = new Date();
-    return agora.getHours() * 60 + agora.getMinutes();
+    var agora = agoraNoRio();
+    return parseInt(agora.hour, 10) * 60 + parseInt(agora.minute, 10);
   }
 
   // itensAgendaPorDia(diaIso) — só os itens da agenda daquele dia,
