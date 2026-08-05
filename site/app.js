@@ -1013,6 +1013,13 @@
     return dias.indexOf(hoje) !== -1 ? hoje : dias[0];
   }
 
+  // minutosAgora() — minutos desde meia-noite, hora local, pra
+  // posicionar a linha de "agora" no grid da Agenda.
+  function minutosAgora() {
+    var agora = new Date();
+    return agora.getHours() * 60 + agora.getMinutes();
+  }
+
   // itensAgendaPorDia(diaIso) — só os itens da agenda daquele dia,
   // ordenados por início. Relê o estado do zero (sem cache).
   function itensAgendaPorDia(diaIso) {
@@ -1195,11 +1202,27 @@
     return html;
   }
 
+  // linha de "agora": só no dia de hoje, e só se o horário atual cai
+  // dentro da faixa de horas desenhada (senão não tem onde desenhar).
+  function construirHtmlLinhaAgora(diaSelecionado, faixa) {
+    if (diaSelecionado !== hojeIso()) return '';
+    var minutos = minutosAgora();
+    if (minutos < faixa.horaInicio * 60 || minutos > faixa.horaFim * 60) return '';
+    var top = (minutos - faixa.horaInicio * 60) * ESCALA_PX_MIN;
+    return '<div class="agenda-grade__linha-agora" id="agenda-grade-linha-agora" style="top:' + top + 'px"></div>';
+  }
+
+  // faixa de horas do grid atualmente na tela — guardada pra
+  // atualizarLinhaAgora() reposicionar a linha sem precisar re-renderizar
+  // o grid inteiro (o que resetaria o scroll horizontal).
+  var agendaFaixaAtual = null;
+
   // grid do dia: coluna de horas + área de eventos com hairlines a cada
   // hora e os cards posicionados por posicionarNoGrid.
-  function construirHtmlGradeAgenda(itens) {
+  function construirHtmlGradeAgenda(itens, diaSelecionado) {
     var faixa = calcularFaixaHoras(itens);
     var alturaTotal = (faixa.horaFim - faixa.horaInicio) * 60 * ESCALA_PX_MIN;
+    agendaFaixaAtual = { dia: diaSelecionado, faixa: faixa };
 
     var posicoes = posicionarNoGrid(itens);
     var mapaPos = {};
@@ -1231,6 +1254,7 @@
       (maxColunas * LARGURA_MIN_COLUNA_PX) + 'px">';
     html += linhas;
     html += cardsHtml;
+    html += construirHtmlLinhaAgora(diaSelecionado, faixa);
     html += '</div></div></div>';
     return html;
   }
@@ -1276,12 +1300,44 @@
     var html = '<h3 class="lista__cabecalho-dia">Exibindo ' + itensDoDia.length +
       (itensDoDia.length === 1 ? ' palestra' : ' palestras') + '</h3>';
     if (!itensDoDia.length) {
+      agendaFaixaAtual = null; // nada no grid, nada pra linha de agora reposicionar
       html += '<p class="lista__vazio">Nada na agenda nesse dia. Adicione a partir da Programação.</p>';
     } else {
-      html += construirHtmlGradeAgenda(itensDoDia);
+      html += construirHtmlGradeAgenda(itensDoDia, agendaDiaSelecionado);
     }
 
     elConteudo.innerHTML = html;
+  }
+
+  // atualizarLinhaAgora() — reposiciona (ou remove/recria) só a linha de
+  // "agora" no grid já desenhado, sem re-renderizar a Agenda inteira —
+  // um re-render completo resetaria o scroll horizontal do grid a cada
+  // tick. Chamado por um intervalo enquanto a aba Agenda está visível.
+  function atualizarLinhaAgora() {
+    var elSecao = document.getElementById('agenda');
+    if (!elSecao || elSecao.hidden) return;
+    if (!agendaFaixaAtual) return;
+
+    var elEventos = document.querySelector('#agenda-conteudo .agenda-grade__eventos');
+    if (!elEventos) return;
+
+    var elLinha = document.getElementById('agenda-grade-linha-agora');
+    var dentroDaFaixa = agendaFaixaAtual.dia === hojeIso() &&
+      minutosAgora() >= agendaFaixaAtual.faixa.horaInicio * 60 &&
+      minutosAgora() <= agendaFaixaAtual.faixa.horaFim * 60;
+
+    if (!dentroDaFaixa) {
+      if (elLinha) elLinha.parentNode.removeChild(elLinha);
+      return;
+    }
+
+    var top = (minutosAgora() - agendaFaixaAtual.faixa.horaInicio * 60) * ESCALA_PX_MIN;
+    if (elLinha) {
+      elLinha.style.top = top + 'px';
+    } else {
+      elEventos.insertAdjacentHTML('beforeend',
+        '<div class="agenda-grade__linha-agora" id="agenda-grade-linha-agora" style="top:' + top + 'px"></div>');
+    }
   }
 
   // -----------------------------------------------------------
@@ -1707,6 +1763,11 @@
     });
 
     window.addEventListener('hashchange', rotear);
+
+    // linha de "agora" na Agenda: reposiciona a cada minuto, sem
+    // re-renderizar o grid inteiro (atualizarLinhaAgora() já checa se a
+    // aba está visível antes de mexer no DOM).
+    setInterval(atualizarLinhaAgora, 60 * 1000);
 
     rotear(); // mostra a aba certa (ou Programação) já de cara
 

@@ -768,6 +768,31 @@ body {
   background: var(--divisoria);
 }
 
+/* linha do horário atual — só aparece no dia de hoje, dentro da faixa
+   de horas desenhada. Fica por cima dos cards (pedido da Carla: "dá pra
+   ver de relance onde eu tô agora"), mas não intercepta clique. */
+.agenda-grade__linha-agora {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--alerta-vermelho);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.agenda-grade__linha-agora::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--alerta-vermelho);
+}
+
 /* card resumido: neutro, com filete da cor da trilha — a cor "livre" é
    só do chip de caminhada (regra da Carla). */
 .agenda-grade__card {
