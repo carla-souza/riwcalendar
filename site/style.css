@@ -164,6 +164,34 @@ body {
   color: var(--cor-acao);
 }
 
+/* ---------- botão flutuante "voltar ao topo" (Programação) ---------- */
+.botao-topo {
+  position: fixed;
+  right: 16px;
+  bottom: calc(64px + env(safe-area-inset-bottom) + 16px);
+  z-index: 9;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: var(--cor-acao);
+  color: var(--texto-sobre-acao);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: rgba(9, 30, 66, 0.25) 0 4px 8px, rgba(9, 30, 66, 0.13) 0 0 1px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.botao-topo:active {
+  background: var(--cor-acao-pressed);
+}
+
+.botao-topo[hidden] {
+  display: none;
+}
+
 /* ---------- conteúdo / seções ---------- */
 .conteudo {
   padding: 0 16px 16px;

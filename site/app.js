@@ -1783,6 +1783,20 @@
 
     window.addEventListener('hashchange', rotear);
 
+    // botão "voltar ao topo" da Programação: some/aparece com o scroll da
+    // página (é a seção inteira que rola, não um container interno) e some
+    // sozinho quando a aba não está visível (herda o display:none do
+    // .secao[hidden] pai, sem precisar checar a aba aqui).
+    var botaoTopo = document.getElementById('programacao-topo');
+    if (botaoTopo) {
+      window.addEventListener('scroll', function () {
+        botaoTopo.hidden = window.scrollY < 400;
+      });
+      botaoTopo.addEventListener('click', function () {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    }
+
     // linha de "agora" na Agenda: reposiciona a cada minuto, sem
     // re-renderizar o grid inteiro (atualizarLinhaAgora() já checa se a
     // aba está visível antes de mexer no DOM).
